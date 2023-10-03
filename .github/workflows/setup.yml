@@ -1,0 +1,34 @@
+name: setup
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    concurrency:
+      # only allow one job per PR running
+      # older pending jobs will be cancelled not to waste CI minutes
+      # cannot use github.job here https://github.com/community/community/discussions/13496
+      group: ${{ github.workflow }}-setup-${{ github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Chalk
+        uses: ./
+
+      - name: Verify Setup
+        run: |
+          echo 'log_level: "trace"' | sudo tee /etc/chalk.conf
+          set -x
+          which chalk
+          which docker
+          chalk version
+          docker version
