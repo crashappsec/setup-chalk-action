@@ -1,0 +1,37 @@
+name: Setup Chalk
+description: Install chalk and wrap supported commands
+
+inputs:
+  version:
+    description: |
+      Version of chalk to install.
+      By default latest version is installed.
+      See https://crashoverride.com/releases for all available versions.
+    required: false
+  load:
+    description: |
+      Chalk config to load.
+      Can be either path to a file or an URL.
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    # https://docs.sigstore.dev/system_config/installation/
+    - name: Install cosign
+      uses: sigstore/cosign-installer@main
+
+    - name: Add Chalk to PATH
+      shell: bash
+      run: |
+        echo "$HOME/.chalk/bin" >> $GITHUB_PATH
+
+    - name: Set up chalk
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: |
+        ./setup.sh \
+          --version=${{ inputs.version }} \
+          --load=${{ inputs.load }} \
+          --prefix=$HOME/.chalk \
+          ${{ runner.debug == '1' && '--debug' || '' }}
