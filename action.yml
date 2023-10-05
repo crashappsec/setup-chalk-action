@@ -19,14 +19,17 @@ runs:
   steps:
     # https://docs.sigstore.dev/system_config/installation/
     - name: Install cosign
+      if: runner.os == 'Linux' || runner.os == 'macOS'
       uses: sigstore/cosign-installer@main
 
     - name: Add Chalk to PATH
+      if: runner.os == 'Linux' || runner.os == 'macOS'
       shell: bash
       run: |
         echo "$HOME/.chalk/bin" >> $GITHUB_PATH
 
     - name: Set up chalk
+      if: runner.os == 'Linux' || runner.os == 'macOS'
       shell: bash
       working-directory: ${{ github.action_path }}
       run: |
