@@ -20,7 +20,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Set up Chalk
-        uses: crashappsec/setup-chalk-version
+        uses: crashappsec/setup-chalk-action@main
 ```
 
 ## Customizing
@@ -36,7 +36,7 @@ For example:
 
 ```yaml
 - name: Set up Chalk
-  uses: crashappsec/setup-chalk-version
+  uses: crashappsec/setup-chalk-action@main
   with:
     version: "0.1.2"
     load: "https://chalkdust.io/compliance-docker.c4m"
