@@ -1,6 +1,6 @@
 # Setup Chalk
 
-GitHub Action to setting up [Chalk].
+GitHub Action for setting up [Chalk].
 
 This action will install `chalk` and will also wrap other commands
 `chalk` supports such as `docker`.
@@ -39,7 +39,14 @@ For example:
   uses: crashappsec/setup-chalk-version
   with:
     version: "0.1.2"
+    load: "https://chalkdust.io/compliance-docker.c4m"
 ```
 
 [chalk]: https://github.com/crashappsec/chalk/
 [releases]: https://crashoverride.com/releases
+
+## Contributing
+
+We welcome contributions but do require you to complete a contributor
+license agreement or CLA. You can read the CLA and about our process
+[here](https://crashoverride.com/docs/other/contributing).
