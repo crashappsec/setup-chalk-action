@@ -2,8 +2,18 @@
 
 GitHub Action for setting up [Chalk].
 
-This action will install `chalk` and will also wrap other commands
-`chalk` supports such as `docker`.
+Chalk captures metadata at build time, and adds a small 'chalk mark' (metadata)
+to any artifacts, so they can be identified in production. This GitHub action
+simplifies the process of deploying `chalk` for GitHub action users. The
+action:
+
+- Installs `chalk` CLI in the GitHub runner (hosted and
+  self-hosted). You can then start using `chalk` in your GitHub workflows.
+- Wraps `docker` with `chalk`. As such, any GitHub workflows using `docker`
+  will automatically start using `chalk` when building any Docker images.
+- Allows to `load` `chalk` configuration from a file or an URL. For
+  example this can configure `chalk` to send metadata reports to an
+  external server for metadata collection.
 
 ## Usage
 
@@ -38,7 +48,7 @@ For example:
 - name: Set up Chalk
   uses: crashappsec/setup-chalk-action@main
   with:
-    version: "0.1.2"
+    version: "0.1.3"
     load: "https://chalkdust.io/compliance-docker.c4m"
 ```
 
