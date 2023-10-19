@@ -154,11 +154,14 @@ function add_line_to_config {
 
 # add lines to chalk config
 function add_lines_to_chalk {
-    config=$(mktemp -t chalk.c4m.XXXXXX)
-    chalk dump > "$config"
+    config=$(mktemp -t chalk_XXXXXX.c4m)
+    chalk dump "$config"
     for i; do
         add_line_to_config "$i" "$config"
     done
+    if [ -n "$debug" ]; then
+        cat "$config"
+    fi
     chalk load "$config"
 }
 

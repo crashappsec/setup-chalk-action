@@ -48,7 +48,7 @@ For example:
 - name: Set up Chalk
   uses: crashappsec/setup-chalk-action@main
   with:
-    version: "0.1.3"
+    version: "0.2.0"
     load: "https://chalkdust.io/compliance-docker.c4m"
 ```
 
