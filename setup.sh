@@ -88,20 +88,24 @@ function get_latest_version {
     echo "$version"
 }
 
+# get the folder what to download
+function chalk_folder {
+    if echo "$version" | grep -E '^[a-fA-F0-9]{40}$' &> /dev/null; then
+        echo "chalk-commit-builds"
+    else
+        echo "chalk"
+    fi
+}
+
 # get the chalk file name for the version/os/architecture
 function chalk_version_name {
-    name="chalk-$version-$(uname -s)-$(uname -m)"
-    if echo "$version" | grep -E '^[a-fA-F0-9]{40}$' &> /dev/null; then
-        echo "chalk-commit-builds/$name"
-    else
-        echo "chalk/$name"
-    fi
+    echo "chalk-$version-$(uname -s)-$(uname -m)"
 }
 
 # download chalk and validate its checksum
 function download_chalk {
     name=$(chalk_version_name)
-    url=$URL_PREFIX/$(chalk_version_name)
+    url=$URL_PREFIX/$(chalk_folder)/$(chalk_version_name)
     info Downloading chalk from "$url"
     rm -f "$TMP/$name"{,.sha256}
     wget --quiet --directory-prefix=$TMP "$url"{,.sha256} || (
@@ -141,7 +145,7 @@ function normalize_cosign {
 # load custom chalk config
 function load_config {
     info Loading custom chalk config from "$load"
-    chalk load "$load"
+    chalk load --replace "$load"
 }
 
 # add line to config file if its not there already
@@ -160,14 +164,14 @@ function add_line_to_config {
 # add lines to chalk config
 function add_lines_to_chalk {
     config=$(mktemp -t chalk_XXXXXX.c4m)
-    chalk dump "$config"
+    chalk dump > "$config"
     for i; do
         add_line_to_config "$i" "$config"
     done
+    chalk load --replace "$config"
     if [ -n "$debug" ]; then
-        cat "$config"
+        chalk dump
     fi
-    chalk load "$config"
 }
 
 # add necessary configs to wrap command with chalk
