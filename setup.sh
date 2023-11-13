@@ -4,7 +4,7 @@ set -eEu
 set -o pipefail
 shopt -s extglob
 
-URL_PREFIX=https://crashoverride.com/dl/chalk
+URL_PREFIX=https://crashoverride.com/dl
 SHA256=sha256sum
 SUDO=sudo
 TMP=/tmp
@@ -90,7 +90,12 @@ function get_latest_version {
 
 # get the chalk file name for the version/os/architecture
 function chalk_version_name {
-    echo "chalk-$version-$(uname -s)-$(uname -m)"
+    name="chalk-$version-$(uname -s)-$(uname -m)"
+    if echo "$version" | grep -E '^[a-fA-F0-9]{40}$' &> /dev/null; then
+        echo "chalk-commit-builds/$name"
+    else
+        echo "chalk/$name"
+    fi
 }
 
 # download chalk and validate its checksum
