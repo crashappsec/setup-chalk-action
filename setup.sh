@@ -1,20 +1,23 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 
-set -eEu
-set -o pipefail
-shopt -s extglob
+set -eu
 
 URL_PREFIX=https://crashoverride.com/dl
 SHA256=sha256sum
 SUDO=sudo
 TMP=/tmp
 
+is_installed() {
+    name=$1
+    which "$name" > /dev/null 2>&1
+}
+
 # on osx, sha256sum doesnt exist and instead its shasum
-if [ -z "$(which $SHA256 2> /dev/null)" ]; then
+if ! is_installed "$SHA256"; then
     SHA256="shasum -a 256"
 fi
 
-if [ -z "$(which sudo 2> /dev/null)" ]; then
+if ! is_installed sudo; then
     SUDO=
 fi
 
@@ -33,70 +36,83 @@ log_level=error
 # if running in debug mode
 debug=
 
-function color {
+color() {
     (
         set +x
-        declare -A COLORS
-        if [ -z "${NO_COLOR:-}" ]; then
-            COLORS[yellow]="\033[0;33m"
-            COLORS[blue]="\033[0;34m"
-            COLORS[red]="\033[0;31m"
-            COLORS[green]="\033[0;32m"
-            COLORS[end]="\033[0m"
-        fi
-        color=$(echo "$1" | tr "[:upper:]" "[:lower:]")
+        name=$1
         shift
+        color=
+        end=
+        if [ -z "${NO_COLOR:-}" ]; then
+            case $name in
+                yellow)
+                    color="\033[0;33m"
+                    ;;
+                blue)
+                    color="\033[0;34m"
+                    ;;
+                red)
+                    color="\033[0;31m"
+                    ;;
+                green)
+                    color="\033[0;32m"
+                    ;;
+            esac
+            end="\033[0m"
+        fi
         args="$*"
-        echo -en "${COLORS[$color]:-}$args${COLORS[end]:-}"
+        printf "$color%s$end" "$args"
     )
 }
 
-function info {
-    echo "$(color GREEN INFO:)" "$@" > /dev/stderr
+info() {
+    echo "$(color green INFO:)" "$@" > /dev/stderr
 }
 
-function warn {
+warn() {
     echo "$(color yellow WARN:)" "$@" > /dev/stderr
 }
 
-function error {
+error() {
     echo "$(color red ERROR:)" "$@" > /dev/stderr
 }
 
-function fatal {
+fatal() {
     error "$@"
     exit 1
 }
 
-function first_owner {
+first_owner() {
     path=$1
-    while ! stat "$path" &> /dev/null; do
+    while
+        ! stat "$path" > /dev/null 2>&1
+    do
         path=$(dirname "$path")
     done
     stat -c %u "$path"
 }
 
-function am_owner {
+am_owner() {
     path=$1
     uid=$(id -u)
     path_uid=$(first_owner "$path")
     [ "$uid" = "$path_uid" ]
 }
 
-function enable_debug {
+enable_debug() {
     set -x
     log_level=trace
     debug=true
 }
 
 # wrapper for calling chalk within the script
-function chalk {
+chalk() {
     $SUDO chmod +xr "$chalk_path"
     timeout -s KILL 10s $SUDO "$chalk_path" --log-level=$log_level --skip-summary-report --skip-command-report "$@"
 }
 
 # find out latest chalk version
-function get_latest_version {
+get_latest_version() {
     info Querying latest version of chalk
     version=$(curl -fsSL "$URL_PREFIX/current-version.txt")
     info Latest version is "$version"
@@ -104,8 +120,8 @@ function get_latest_version {
 }
 
 # get the folder what to download
-function chalk_folder {
-    if echo "$version" | grep -E '^[a-fA-F0-9]{40}$' &> /dev/null; then
+chalk_folder() {
+    if echo "$version" | grep -E '^[a-fA-F0-9]{40}$' > /dev/null 2>&1; then
         echo "chalk-commit-builds"
     else
         echo "chalk"
@@ -113,17 +129,17 @@ function chalk_folder {
 }
 
 # get the chalk file name for the version/os/architecture
-function chalk_version_name {
+chalk_version_name() {
     echo "chalk-$version-$(uname -s)-$(uname -m)"
 }
 
 # download chalk and validate its checksum
-function download_chalk {
+download_chalk() {
     name=$(chalk_version_name)
     url=$URL_PREFIX/$(chalk_folder)/$(chalk_version_name)
     info Downloading chalk from "$url"
-    rm -f "$TMP/$name"{,.sha256}
-    wget --quiet --directory-prefix=$TMP "$url"{,.sha256} || (
+    rm -f "$TMP/$name" "$TMP/$name.sha256"
+    wget --quiet --directory-prefix=$TMP "$url" "$url.sha256" || (
         fatal Could not download "$(chalk_version_name)". Are you sure this is a valid version?
     )
     checksum=$(cat "$chalk_tmp.sha256")
@@ -142,7 +158,7 @@ function download_chalk {
 
 # validate downloaded chalk can run on the system
 # and then install it to $chalk_path which should be on PATH
-function install_chalk {
+install_chalk() {
     info Checking chalk version
     chalk_path=$chalk_tmp chalk version
     info Installing chalk to "$chalk_path"
@@ -150,8 +166,8 @@ function install_chalk {
     $SUDO cp "$chalk_tmp" "$chalk_path"
 }
 
-function normalize_cosign {
-    if which cosign 2> /dev/null; then
+normalize_cosign() {
+    if is_installed cosign; then
         # TODO fix in src/configs/attestation.c4m
         info Copying cosign to /tmp for chalk
         cp "$(which cosign)" /tmp/cosign
@@ -159,16 +175,16 @@ function normalize_cosign {
 }
 
 # load custom chalk config
-function load_config {
+load_config() {
     info Loading custom chalk config from "$load"
     chalk load --replace "$load"
 }
 
 # add line to config file if its not there already
-function add_line_to_config {
+add_line_to_config() {
     line=$1
     config=$2
-    if grep "$line" "$config" &> /dev/null; then
+    if grep "$line" "$config" > /dev/null 2>&1; then
         info "$cmd" path is already configured in chalk config
         return 0
     fi
@@ -178,7 +194,7 @@ function add_line_to_config {
 }
 
 # add lines to chalk config
-function add_lines_to_chalk {
+add_lines_to_chalk() {
     config=$(mktemp -t chalk_XXXXXX).c4m
     chalk dump > "$config"
     for i; do
@@ -191,7 +207,7 @@ function add_lines_to_chalk {
 }
 
 # add necessary configs to wrap command with chalk
-function add_cmd_exe_to_config {
+add_cmd_exe_to_config() {
     cmd=$1
     path=$2
     folder=$(dirname "$path")
@@ -201,9 +217,14 @@ function add_cmd_exe_to_config {
 }
 
 # wrap given command with chalk
-function wrap_cmd {
+wrap_cmd() {
     cmd=$1
-    existing_path=$(which "$cmd" 2> /dev/null || true)
+
+    if ! is_installed "$cmd"; then
+        return
+    fi
+
+    existing_path=$(which "$cmd")
     chalked_path="$prefix/bin/$cmd"
     chalkless_path="$prefix/chalkless/$cmd"
 
@@ -246,7 +267,7 @@ for arg; do
             ;;
         --prefix=*)
             prefix=${arg##*=}
-            prefix="${prefix/#\~/$HOME}"
+            prefix=$(echo "$prefix" | sed "s#~#$HOME#" | sed 's/bin$//')
             prefix=$(realpath "$prefix")
             ;;
         --chalk-path=*)
@@ -274,11 +295,7 @@ if [ "${ACTIONS_STEP_DEBUG:-}" = "true" ]; then
     enable_debug
 fi
 
-if [[ "$prefix" == *"/bin" ]]; then
-    prefix=$(dirname "$prefix")
-fi
-
-if [[ "$PATH" != ?(*:)"$prefix/bin"?(:*) ]]; then
+if ! echo "$PATH" | tr ":" "\n" | grep "$prefix/bin"; then
     fatal "$prefix/bin" is not part of PATH. "--prefix=<prefix>/bin" must be part of PATH
 fi
 
