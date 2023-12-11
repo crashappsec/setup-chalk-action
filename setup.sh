@@ -2,7 +2,8 @@
 
 set -eu
 
-URL_PREFIX=https://crashoverride.com/dl
+# URL_PREFIX=https://crashoverride.com/dl
+URL_PREFIX=https://dl.crashoverride.run
 SHA256=sha256sum
 SUDO=sudo
 TMP=/tmp
@@ -35,6 +36,9 @@ wrap=true
 log_level=error
 # if running in debug mode
 debug=
+# instead of downloading chalk, copy it from this path
+# this is meant for testing local chalk binaries
+copy_from=
 
 color() {
     (
@@ -114,7 +118,7 @@ chalk() {
 # find out latest chalk version
 get_latest_version() {
     info Querying latest version of chalk
-    version=$(curl -fsSL "$URL_PREFIX/current-version.txt")
+    version=$(curl -fsSL "$URL_PREFIX/chalk/current-version.txt")
     info Latest version is "$version"
     echo "$version"
 }
@@ -136,11 +140,18 @@ chalk_version_name() {
 # download chalk and validate its checksum
 download_chalk() {
     name=$(chalk_version_name)
-    url=$URL_PREFIX/$(chalk_folder)/$(chalk_version_name)
+
+    if [ -n "$copy_from" ]; then
+        info Copying existing chalk from "$copy_from"
+        cp "$copy_from" "$TMP/$name"
+        return
+    fi
+
+    url=$URL_PREFIX/$(chalk_folder)/$name
     info Downloading chalk from "$url"
     rm -f "$TMP/$name" "$TMP/$name.sha256"
     wget --quiet --directory-prefix=$TMP "$url" "$url.sha256" || (
-        fatal Could not download "$(chalk_version_name)". Are you sure this is a valid version?
+        fatal Could not download "$name". Are you sure this is a valid version?
     )
     checksum=$(cat "$chalk_tmp.sha256")
     info Validating sha256 checksum "${checksum%% *}"
@@ -164,6 +175,7 @@ install_chalk() {
     info Installing chalk to "$chalk_path"
     $SUDO mkdir -p "$(dirname "$chalk_path")"
     $SUDO cp "$chalk_tmp" "$chalk_path"
+    $SUDO chmod +xr "$chalk_path"
 }
 
 normalize_cosign() {
@@ -252,6 +264,7 @@ wrap_cmd() {
     tmp=$(mktemp -t chalk.XXXXXX)
     $SUDO cp "$chalk_path" "$tmp"
     chalk_path=$tmp add_cmd_exe_to_config "$cmd" "$chalkless_path"
+    $SUDO rm "$chalked_path" 2> /dev/null || true
     $SUDO cp "$tmp" "$chalked_path"
     info Using "$chalked_path" will automatically use chalk now
 }
@@ -284,6 +297,9 @@ for arg; do
             ;;
         --no-overwrite)
             overwrite=
+            ;;
+        --copy-from=*)
+            copy_from=${arg##*=}
             ;;
         *)
             set -- "$@" "$arg"
