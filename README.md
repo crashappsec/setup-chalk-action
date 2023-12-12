@@ -59,4 +59,4 @@ For example:
 
 We welcome contributions but do require you to complete a contributor
 license agreement or CLA. You can read the CLA and about our process
-[here](https://crashoverride.com/docs/other/contributing).
+[here](https://github.com/crashappsec/.github/blob/main/CLA-process.md).
