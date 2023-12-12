@@ -1,0 +1,10 @@
+services:
+  action:
+    build:
+      context: .
+      target: ${TARGET:-alpine}
+    working_dir: /action
+    user: ${USER:-root}
+    volumes:
+      - ../:/action
+      - ../../chalk:/chalk
