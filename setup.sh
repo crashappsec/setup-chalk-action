@@ -197,7 +197,7 @@ add_line_to_config() {
     line=$1
     config=$2
     if grep "$line" "$config" > /dev/null 2>&1; then
-        info "$cmd" path is already configured in chalk config
+        info "$line" is already configured in chalk config
         return 0
     fi
     info Adding "'$line'" to chalk config
