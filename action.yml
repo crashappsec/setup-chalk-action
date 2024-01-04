@@ -35,6 +35,6 @@ runs:
       run: |
         ./setup.sh \
           --version=${{ inputs.version }} \
-          --load=${{ inputs.load }} \
+          --load="${{ inputs.load }}" \
           --prefix=$HOME/.chalk \
           ${{ runner.debug == '1' && '--debug' || '' }}

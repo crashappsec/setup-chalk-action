@@ -39,6 +39,8 @@ debug=
 # instead of downloading chalk, copy it from this path
 # this is meant for testing local chalk binaries
 copy_from=
+# chalk command timeout
+timeout=60
 
 color() {
     (
@@ -112,7 +114,7 @@ enable_debug() {
 # wrapper for calling chalk within the script
 chalk() {
     $SUDO chmod +xr "$chalk_path"
-    timeout -s KILL 10s $SUDO "$chalk_path" --log-level=$log_level --skip-summary-report --skip-command-report "$@"
+    timeout -s KILL "${timeout}s" $SUDO "$chalk_path" --log-level=$log_level --skip-summary-report --skip-command-report "$@"
 }
 
 # find out latest chalk version
@@ -300,6 +302,9 @@ for arg; do
             ;;
         --copy-from=*)
             copy_from=${arg##*=}
+            ;;
+        --timeout=*)
+            timeout=${arg##*=}
             ;;
         *)
             set -- "$@" "$arg"
