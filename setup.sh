@@ -41,6 +41,8 @@ debug=
 copy_from=
 # chalk command timeout
 timeout=60
+# which platforms to download for multi-platform builds
+platforms=
 
 color() {
     (
@@ -136,12 +138,15 @@ chalk_folder() {
 
 # get the chalk file name for the version/os/architecture
 chalk_version_name() {
-    echo "chalk-$version-$(uname -s)-$(uname -m)"
+    os=${os:-$(uname -s)}
+    arch=${arch:-$(uname -m)}
+    echo "chalk-$version-$os-$arch"
 }
 
 # download chalk and validate its checksum
 download_chalk() {
     name=$(chalk_version_name)
+    chalk_tmp=$TMP/$(chalk_version_name)
 
     if [ -n "$copy_from" ]; then
         info Copying existing chalk from "$copy_from"
@@ -155,15 +160,18 @@ download_chalk() {
     wget --quiet --directory-prefix=$TMP "$url" "$url.sha256" || (
         fatal Could not download "$name". Are you sure this is a valid version?
     )
+    if ! [ -f "$chalk_tmp" ]; then
+        return 1
+    fi
     checksum=$(cat "$chalk_tmp.sha256")
     info Validating sha256 checksum "${checksum%% *}"
     (
         cd $TMP
-        $SHA256 -c "$chalk_tmp.sha256" || (
+        $SHA256 -c "$chalk_tmp.sha256" > /dev/stderr || (
             error Expected checksum:
-            cat "$chalk_tmp.sha256"
+            cat "$chalk_tmp.sha256" > /dev/stderr
             error Downloaded checksum:
-            $SHA256 "$chalk_tmp"
+            $SHA256 "$chalk_tmp" > /dev/stderr
             fatal Oh no. Checksum validation failed. Exiting as chalk binary might of been tampered with
         )
     )
@@ -177,7 +185,30 @@ install_chalk() {
     info Installing chalk to "$chalk_path"
     $SUDO mkdir -p "$(dirname "$chalk_path")"
     $SUDO cp "$chalk_tmp" "$chalk_path"
-    $SUDO chmod +xr "$chalk_path"
+    $SUDO chmod +xr "$chalk_tmp"
+}
+
+download_platform() {
+    platform=$1
+    case $platform in
+        */*)
+            os=$(echo "$platform" | cut -d/ -f1)
+            arch=$(echo "$platform" | cut -d/ -f2)
+            ;;
+        *)
+            os=$(uname -s | tr "[:upper:]" "[:lower:]")
+            arch=$platform
+            ;;
+    esac
+    download_chalk
+    if ! [ -f "$chalk_tmp" ]; then
+        return 1
+    fi
+    arch_path=~/.local/chalk/bin/${os}-${arch}/chalk
+    info Copying chalk "$os/$arch" to "$arch_path"
+    mkdir -p "$(dirname "$arch_path")"
+    cp "$chalk_tmp" "$arch_path"
+    chmod +xr "$arch_path"
 }
 
 normalize_cosign() {
@@ -306,6 +337,9 @@ for arg; do
         --timeout=*)
             timeout=${arg##*=}
             ;;
+        --platforms=*)
+            platforms=${arg##*=}
+            ;;
         *)
             set -- "$@" "$arg"
             ;;
@@ -321,6 +355,7 @@ if ! echo "$PATH" | tr ":" "\n" | grep "$prefix/bin"; then
 fi
 
 chalk_path=$prefix/bin/chalk
+chalk_tmp=
 
 if am_owner "$prefix"; then
     SUDO=
@@ -339,14 +374,18 @@ if ! [ -f "$chalk_path" ] || [ -n "$overwrite" ]; then
         version=$(get_latest_version)
     fi
 
-    chalk_tmp=$TMP/$(chalk_version_name)
-
     download_chalk
     install_chalk
     normalize_cosign
 else
     info "$chalk_path" is already installed. skipping
 fi
+
+for platform in $(echo "$platforms" | tr "," "\n"); do
+    download_platform "$platform" || (
+        warn Chalk will not be able to wrap builds for "$platform"
+    )
+done
 
 if [ -n "$load" ]; then
     load_config
