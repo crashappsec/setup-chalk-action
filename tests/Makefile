@@ -3,10 +3,10 @@ LOAD?=
 DOCKER=docker compose run --rm -T action sh -c
 
 ifneq "$(DEBUG)" ""
-ARG_DEBUG=--debug
+ARGS+=--debug
 endif
 ifneq "$(COPY)" ""
-ARG_COPY_FROM=--copy-from=/chalk/chalk
+ARGS+=--copy-from=/chalk/chalk
 endif
 
 define SETUP=
@@ -27,8 +27,9 @@ default:
 		$(SETUP) \
 		--version=$(VERSION) \
 		--load=$(LOAD) \
-		$(ARG_DEBUG) \
-		$(ARG_COPY_FROM) \
+		--params='$(PARAMS)' \
+		--token=$(TOKEN) \
+		$(ARGS) \
 		$(CHECK) \
 	'
 
@@ -38,9 +39,10 @@ prefix:
 		$(SETUP) \
 		--version=$(VERSION) \
 		--load=$(LOAD) \
+		--params='$(subst ",\\\",$(PARAMS))' \
+		--token=$(TOKEN) \
 		--prefix=~/.chalk/bin \
-		$(ARG_DEBUG) \
-		$(ARG_COPY_FROM) \
+		$(ARGS) \
 		$(CHECK) \
 	'
 

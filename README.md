@@ -37,10 +37,12 @@ jobs:
 
 The following parameters can be provided to the action.
 
-| Name      | Type   | Default | Description                                                                                                     |
-| --------- | ------ | ------- | --------------------------------------------------------------------------------------------------------------- |
-| `version` | String |         | Version of chalk to install. By default latest version is installed. See [releases] for all available versions. |
-| `load`    | String |         | Chalk config to load. Can be either path to a file or an URL.                                                   |
+| Name      | Type   | Default | Description                                                                                                                                     |
+| --------- | ------ | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `version` | String |         | Version of chalk to install. By default latest version is installed. See [releases] for all available versions.                                 |
+| `load`    | String |         | Chalk config to load. Can be either path to a file or an URL.                                                                                   |
+| `params`  | String |         | Chalk components params to load. Should be JSON array with all parameter values. JSON structure is the same as provided by `chalk dump params`. |
+| `token`   | String |         | CrashOverride API Token. Get your API token at [CrashOverride]                                                                                  |
 
 For example:
 
@@ -49,11 +51,13 @@ For example:
   uses: crashappsec/setup-chalk-action@main
   with:
     version: "0.2.0"
-    load: "https://chalkdust.io/compliance-docker.c4m"
+    load: "https://chalkdust.io/connect.c4m"
+    token: ${{ secrets.CHALK_TOKEN }}
 ```
 
 [chalk]: https://github.com/crashappsec/chalk/
 [releases]: https://crashoverride.com/releases
+[CrashOverride]: https://crashoverride.run
 
 ## Contributing
 

@@ -13,6 +13,18 @@ inputs:
       Chalk config to load.
       Can be either path to a file or an URL.
     required: false
+  params:
+    description: |
+      Chalk components params to load.
+      Should be JSON array with all parameter values.
+      JSON structure is the same as provided by
+      'chalk dump params'.
+    required: false
+  token:
+    description: |
+      CrashOverride API Token.
+      Get your API token at CrashOverride: https://crashoverride.run
+    required: false
 
 runs:
   using: "composite"
@@ -36,5 +48,6 @@ runs:
         ./setup.sh \
           --version=${{ inputs.version }} \
           --load="${{ inputs.load }}" \
+          --params='${{ inputs.params }}' \
           --prefix=$HOME/.chalk \
           ${{ runner.debug == '1' && '--debug' || '' }}

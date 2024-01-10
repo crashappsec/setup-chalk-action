@@ -26,6 +26,10 @@ fi
 version=
 # which config to load after install
 load=
+# json params to load
+params=
+# CrashOverride API token
+token=
 # ${prefix}/bin is where script should install chalk and wrapped commands
 prefix=/usr/local
 # whether to overwrite existing chalk binary
@@ -221,8 +225,20 @@ normalize_cosign() {
 
 # load custom chalk config
 load_config() {
-    info Loading custom chalk config from "$load"
-    chalk load --replace "$load"
+    module="${load%.*}"
+    if [ -z "$params" ] && [ -n "$token" ]; then
+        params="[[true, \"$module\", \"auth_config.crashoverride.token\", \"string\", \"$token\"]]"
+    fi
+    info PARAMS "$params"
+    if [ -n "$params" ]; then
+        echo "$params" | chalk load "$load" --params
+    else
+        chalk load "$load"
+    fi
+    if [ -n "$debug" ]; then
+        chalk dump
+        chalk dump cache
+    fi
 }
 
 # add line to config file if its not there already
@@ -240,14 +256,17 @@ add_line_to_config() {
 
 # add lines to chalk config
 add_lines_to_chalk() {
-    config=$(mktemp -t chalk_XXXXXX).c4m
-    chalk dump > "$config"
+    name=$1
+    shift
+    config=$(mktemp -t "chalk_${name}_XXXXXX").c4m
+    touch "$config"
     for i; do
-        add_line_to_config "$i" "$config"
+        echo "$i" >> "$config"
     done
-    chalk load --replace "$config"
+    chalk load "$config"
     if [ -n "$debug" ]; then
         chalk dump
+        chalk dump cache
     fi
 }
 
@@ -257,6 +276,7 @@ add_cmd_exe_to_config() {
     path=$2
     folder=$(dirname "$path")
     add_lines_to_chalk \
+        "$cmd" \
         "default_command = \"$cmd\"" \
         "${cmd}_exe = \"$folder\""
 }
@@ -310,6 +330,13 @@ for arg; do
             ;;
         --load=*)
             load=${arg##*=}
+            ;;
+        --token=*)
+            token=${arg##*=}
+            ;;
+        --params=*)
+            params=${arg##*=}
+            info SETTING PARAMS
             ;;
         --prefix=*)
             prefix=${arg##*=}
@@ -388,12 +415,13 @@ for platform in $(echo "$platforms" | tr "," "\n"); do
 done
 
 if [ -n "$load" ]; then
+    info Loading custom chalk config from "$load"
     load_config
 fi
 
 if [ -n "$debug" ]; then
     info Debug mode is enabled. Changing default chalk log level to trace
-    add_lines_to_chalk 'log_level: "trace"'
+    params='' token='' load=https://chalkdust.io/debug.c4m load_config
 fi
 
 if [ -n "$wrap" ]; then
