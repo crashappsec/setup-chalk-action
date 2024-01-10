@@ -10,8 +10,8 @@ inputs:
     required: false
   load:
     description: |
-      Chalk config to load.
-      Can be either path to a file or an URL.
+      Chalk config(s) to load - comma or new-line delimited.
+      Can be either paths to files or URLs.
     required: false
   params:
     description: |

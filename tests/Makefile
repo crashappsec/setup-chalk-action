@@ -26,8 +26,8 @@ default:
 	$(DOCKER) '\
 		$(SETUP) \
 		--version=$(VERSION) \
-		--load=$(LOAD) \
-		--params='$(PARAMS)' \
+		--load="$(LOAD)" \
+		--params='$(subst ",\\\",$(PARAMS))' \
 		--token=$(TOKEN) \
 		$(ARGS) \
 		$(CHECK) \
@@ -38,7 +38,7 @@ prefix:
 	$(DOCKER) '\
 		$(SETUP) \
 		--version=$(VERSION) \
-		--load=$(LOAD) \
+		--load="$(LOAD)" \
 		--params='$(subst ",\\\",$(PARAMS))' \
 		--token=$(TOKEN) \
 		--prefix=~/.chalk/bin \

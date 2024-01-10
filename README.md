@@ -40,7 +40,7 @@ The following parameters can be provided to the action.
 | Name      | Type   | Default | Description                                                                                                                                     |
 | --------- | ------ | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | `version` | String |         | Version of chalk to install. By default latest version is installed. See [releases] for all available versions.                                 |
-| `load`    | String |         | Chalk config to load. Can be either path to a file or an URL.                                                                                   |
+| `load`    | String |         | Chalk config(s) to load - comma or new-line delimited. Can be either paths to files or URLs.                                                    |
 | `params`  | String |         | Chalk components params to load. Should be JSON array with all parameter values. JSON structure is the same as provided by `chalk dump params`. |
 | `token`   | String |         | CrashOverride API Token. Get your API token at [CrashOverride]                                                                                  |
 

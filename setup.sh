@@ -229,7 +229,6 @@ load_config() {
     if [ -z "$params" ] && [ -n "$token" ]; then
         params="[[true, \"$module\", \"auth_config.crashoverride.token\", \"string\", \"$token\"]]"
     fi
-    info PARAMS "$params"
     if [ -n "$params" ]; then
         echo "$params" | chalk load "$load" --params
     else
@@ -414,10 +413,10 @@ for platform in $(echo "$platforms" | tr "," "\n"); do
     )
 done
 
-if [ -n "$load" ]; then
-    info Loading custom chalk config from "$load"
-    load_config
-fi
+for i in $(echo "$load" | tr "," "\n"); do
+    info Loading custom chalk config from "$i"
+    load=$i load_config
+done
 
 if [ -n "$debug" ]; then
     info Debug mode is enabled. Changing default chalk log level to trace
