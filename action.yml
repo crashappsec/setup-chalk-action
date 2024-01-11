@@ -46,8 +46,9 @@ runs:
       working-directory: ${{ github.action_path }}
       run: |
         ./setup.sh \
-          --version=${{ inputs.version }} \
-          --load="${{ inputs.load }}" \
+          --version='${{ inputs.version }}' \
+          --load='${{ inputs.load }}' \
           --params='${{ inputs.params }}' \
+          --token='${{ inputs.token }}' \
           --prefix=$HOME/.chalk \
           ${{ runner.debug == '1' && '--debug' || '' }}
