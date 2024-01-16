@@ -335,7 +335,6 @@ for arg; do
             ;;
         --params=*)
             params=${arg##*=}
-            info SETTING PARAMS
             ;;
         --prefix=*)
             prefix=${arg##*=}
