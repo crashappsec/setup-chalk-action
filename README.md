@@ -50,7 +50,7 @@ For example:
 - name: Set up Chalk
   uses: crashappsec/setup-chalk-action@main
   with:
-    version: "0.2.0"
+    version: "0.3.0"
     load: "https://chalkdust.io/connect.c4m"
     token: ${{ secrets.CHALK_TOKEN }}
 ```
