@@ -147,6 +147,10 @@ chalk_version_name() {
     echo "chalk-$version-$os-$arch"
 }
 
+get_chalk_path() {
+    echo "$prefix/bin/chalk"
+}
+
 # download chalk and validate its checksum
 download_chalk() {
     name=$(chalk_version_name)
@@ -321,6 +325,50 @@ wrap_cmd() {
     info Using "$chalked_path" will automatically use chalk now
 }
 
+help() {
+    cat << EOF
+Setup chalk:
+
+* Downloads binary
+* Verifies checksum
+* Installs to --prefix
+* Wraps supported commands (currently docker)
+
+Usage: ${0} [args]
+
+Args:
+
+-h / --help         Show this message
+--version=*         Chalk version/commit to download.
+                    By default latest version is used.
+--load=*            Comma/newline delimited paths/URLs
+                    of chalk components to load.
+--params=*          JSON of component params to load.
+--token=*           CrashOverride JWT token to load.
+                    Mutually-exclusive with --params.
+--prefix=*          Where to install chalk and related
+                    binaries. Default is ${prefix}.
+--chalk-path=*      Exact path where to install chalk.
+                    Default is $(get_chalk_path).
+--no-wrap=*         Do not wrap supported binaries.
+--debug             Enable debug mode. This enables trace
+                    logs for installed chalk and will
+                    run setup script in verbose mode.
+--[no-]overwrite    Whether to overwrite chalk binary
+                    if $(get_chalk_path) already exists.
+                    Default is ${overwrite}.
+--timeout=*         Timeout for chalk commands.
+                    Default is ${timeout}.
+--platforms=*       Additional platforms to download chalk.
+
+Args for debugging:
+
+--copy-from=*       Instead of downloading chalk binary
+                    copy it from this path instead.
+EOF
+    exit "${1:-0}"
+}
+
 for arg; do
     shift
     case "$arg" in
@@ -365,8 +413,13 @@ for arg; do
         --platforms=*)
             platforms=${arg##*=}
             ;;
+        --help | -h)
+            help 0
+            ;;
         *)
-            set -- "$@" "$arg"
+            error unsupported arg "$arg"
+            echo
+            help 1
             ;;
     esac
 done
@@ -379,7 +432,7 @@ if ! echo "$PATH" | tr ":" "\n" | grep "$prefix/bin"; then
     fatal "$prefix/bin" is not part of PATH. "--prefix=<prefix>/bin" must be part of PATH
 fi
 
-chalk_path=$prefix/bin/chalk
+chalk_path=$(get_chalk_path)
 chalk_tmp=
 
 if am_owner "$prefix"; then
