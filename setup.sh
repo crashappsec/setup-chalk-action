@@ -47,6 +47,10 @@ copy_from=
 timeout=60
 # which platforms to download for multi-platform builds
 platforms=
+# information for signing
+password=${CHALK_PASSWORD:-}
+public_key=
+private_key=
 
 color() {
     (
@@ -325,6 +329,11 @@ wrap_cmd() {
     info Using "$chalked_path" will automatically use chalk now
 }
 
+copy_keys() {
+    $SUDO cp "$public_key" "$(dirname "$chalk_path")/chalk.pub"
+    $SUDO cp "$private_key" "$(dirname "$chalk_path")/chalk.key"
+}
+
 help() {
     cat << EOF
 Setup chalk:
@@ -360,6 +369,9 @@ Args:
 --timeout=*         Timeout for chalk commands.
                     Default is ${timeout}.
 --platforms=*       Additional platforms to download chalk.
+--public-key=*      Path to signing public key.
+--private-key=*     Path to signing private key encrypted with
+                    CHALK_PASSWORD env var.
 
 Args for debugging:
 
@@ -412,6 +424,12 @@ for arg; do
             ;;
         --platforms=*)
             platforms=${arg##*=}
+            ;;
+        --public-key=*)
+            public_key=${arg##*=}
+            ;;
+        --private-key=*)
+            private_key=${arg##*=}
             ;;
         --help | -h)
             help 0
@@ -473,6 +491,12 @@ done
 if [ -n "$debug" ]; then
     info Debug mode is enabled. Changing default chalk log level to trace
     params='' token='' load=https://chalkdust.io/debug.c4m load_config
+fi
+
+if [ -n "$password" ] && [ -f "$public_key" ] && [ -f "$private_key" ]; then
+    info "Loading signing keys into chalk"
+    copy_keys
+    chalk setup
 fi
 
 if [ -n "$wrap" ]; then
