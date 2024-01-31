@@ -6,6 +6,9 @@ on:
 permissions:
   contents: read
 
+env:
+  COSIGN_PASSWORD: 6EHvWD1BUk0yWdvm-GGNxA==
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -21,8 +24,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
+      - name: Install cosign
+        uses: sigstore/cosign-installer@main
+
+      - name: Generate key
+        run: |
+          cosign \
+            generate-key-pair \
+            --output-key-prefix chalk
+          {
+            echo 'PUBLIC_KEY<<EOF'
+            cat chalk.pub
+            echo EOF
+          } >> "$GITHUB_ENV"
+          {
+            echo 'PRIVATE_KEY<<EOF'
+            cat chalk.key
+            echo EOF
+          } >> "$GITHUB_ENV"
+
       - name: Setup Chalk
         uses: ./
+        with:
+          version: cecbf150e2fe0df7a813a8c4cb2923ba62b1fe40
+          password: ${{ env.COSIGN_PASSWORD }}
+          public_key: ${{ env.PUBLIC_KEY }}
+          private_key: ${{ env.PRIVATE_KEY }}
 
       - name: Verify Setup
         run: |
@@ -30,5 +57,7 @@ jobs:
           set -x
           which chalk
           which docker
+          strings $(which chalk) | tail -n 18 | head -n1 | jq
+          strings $(which docker) | tail -n 18 | head -n1 | jq
           chalk version
           docker version

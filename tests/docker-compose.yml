@@ -5,6 +5,8 @@ services:
       target: ${TARGET:-alpine}
     working_dir: /action
     user: ${USER:-root}
+    environment:
+      CHALK_PASSWORD: ${CHALK_PASSWORD:-}
     volumes:
       - ../:/action
       - ../../chalk:/chalk

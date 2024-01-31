@@ -25,6 +25,21 @@ inputs:
       CrashOverride API Token.
       Get your API token at CrashOverride: https://crashoverride.run
     required: false
+  password:
+    description: |
+      Password for chalk signing key.
+      Password is displayed as part of `chalk setup`.
+    required: false
+  public_key:
+    description: |
+      Content of chalk signing public key).
+      Copy from `chalk.pub` after `chalk setup`.
+    required: false
+  private_key:
+    description: |
+      Content of chalk signing encrypted private key (with the provided password).
+      Copy from `chalk.key` after `chalk setup`.
+    required: false
 
 runs:
   using: "composite"
@@ -40,6 +55,30 @@ runs:
       run: |
         echo "$HOME/.chalk/bin" >> $GITHUB_PATH
 
+    - name: Set CHALK_PASSWORD
+      if: inputs.password != ''
+      shell: bash
+      run: |
+        echo "CHALK_PASSWORD=${{ inputs.password }}" >> $GITHUB_ENV
+
+    - name: Save Public Key
+      if: inputs.public_key != ''
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      env:
+        CHALK_PUBLIC_KEY: "${{ inputs.public_key }}"
+      run: |
+        printenv CHALK_PUBLIC_KEY > chalk.pub
+
+    - name: Save Private Key
+      if: inputs.private_key != ''
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      env:
+        CHALK_PRIVATE_KEY: "${{ inputs.private_key }}"
+      run: |
+        printenv CHALK_PRIVATE_KEY > chalk.key
+
     - name: Set up chalk
       if: runner.os == 'Linux' || runner.os == 'macOS'
       shell: bash
@@ -51,4 +90,6 @@ runs:
           --params='${{ inputs.params }}' \
           --token='${{ inputs.token }}' \
           --prefix=$HOME/.chalk \
+          ${{ inputs.public_key != '' && format('--public-key={0}/chalk.pub', github.action_path) || '' }} \
+          ${{ inputs.private_key != '' && format('--private-key={0}/chalk.key', github.action_path) || '' }} \
           ${{ runner.debug == '1' && '--debug' || '' }}
