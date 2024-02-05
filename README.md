@@ -42,6 +42,7 @@ The following parameters can be provided to the action.
 | `version`     | String |         | Version of chalk to install. By default latest version is installed. See [releases] for all available versions.                                 |
 | `load`        | String |         | Chalk config(s) to load - comma or new-line delimited. Can be either paths to files or URLs.                                                    |
 | `params`      | String |         | Chalk components params to load. Should be JSON array with all parameter values. JSON structure is the same as provided by `chalk dump params`. |
+| `connect`     | Bool   |         | Whether to automatically connect to https://crashoverride.run. If true, will load https://chalkdust.io/connect.c4m.                             |
 | `token`       | String |         | CrashOverride API Token. Get your API token at [CrashOverride]                                                                                  |
 | `password`    | String |         | Password for chalk signing key. Password is displayed as part of `chalk setup`.                                                                 |
 | `public_key`  | String |         | Content of chalk signing public key). Copy from `chalk.pub` after `chalk setup`.                                                                |
@@ -54,6 +55,7 @@ For example:
   uses: crashappsec/setup-chalk-action@main
   with:
     version: "0.3.0"
+    connect: true
     load: "https://chalkdust.io/connect.c4m"
     token: ${{ secrets.CHALK_TOKEN }}
     password: ${{ secrets.CHALK_PASSWORD }}
