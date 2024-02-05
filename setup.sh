@@ -4,6 +4,7 @@ set -eu
 
 # URL_PREFIX=https://crashoverride.com/dl
 URL_PREFIX=https://dl.crashoverride.run
+CONNECT=https://chalkdust.io/connect.c4m
 SHA256=sha256sum
 SUDO=sudo
 TMP=/tmp
@@ -234,7 +235,7 @@ normalize_cosign() {
 # load custom chalk config
 load_config() {
     module="${load%.*}"
-    if [ -z "$params" ] && [ -n "$token" ]; then
+    if [ -z "$params" ] && [ -n "$token" ] && [ "$load" = "$CONNECT" ]; then
         params="[[true, \"$module\", \"auth_config.crashoverride.token\", \"string\", \"$token\"]]"
     fi
     if [ -n "$params" ]; then
@@ -392,6 +393,7 @@ for arg; do
             ;;
         --token=*)
             token=${arg##*=}
+            token=$(echo "$token" | tr -d '\n')
             ;;
         --params=*)
             params=${arg##*=}
@@ -442,6 +444,10 @@ for arg; do
     esac
 done
 
+if [ -n "$token" ] && ! echo "$load" | grep "$CONNECT"; then
+    load="$CONNECT,$load"
+fi
+
 if [ "${ACTIONS_STEP_DEBUG:-}" = "true" ]; then
     enable_debug
 fi
@@ -483,7 +489,10 @@ for platform in $(echo "$platforms" | tr "," "\n"); do
     )
 done
 
-for i in $(echo "$load" | tr "," "\n"); do
+for i in $(echo "$load" | tr "," "\n" | tr " " "\n"); do
+    if [ -z "$i" ]; then
+        continue
+    fi
     info Loading custom chalk config from "$i"
     load=$i load_config
 done
