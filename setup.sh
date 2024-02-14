@@ -24,34 +24,34 @@ if ! is_installed sudo; then
 fi
 
 # version of chalk to download
-version=
+version=${CHALK_VERSION:-}
 # which config to load after install
-load=
+load=${CHALK_LOAD:-}
 # json params to load
-params=
+params=${CHALK_PARAMS:-}
 # CrashOverride API token
-token=
+token=${CHALK_TOKEN:-}
 # ${prefix}/bin is where script should install chalk and wrapped commands
-prefix=/usr/local
+prefix=${CHALK_PREFIX:-/usr/local}
 # whether to overwrite existing chalk binary
-overwrite=true
+overwrite=${CHALK_OVERWRITE:-true}
 # whether to wrap external commands with chalk
-wrap=true
+wrap=${CHALK_WRAP:-true}
 # chalk commands log level
-log_level=error
+log_level=${CHALK_LOG_LEVEL:-error}
 # if running in debug mode
-debug=
+debug=${CHALK_DEBUG:-}
 # instead of downloading chalk, copy it from this path
 # this is meant for testing local chalk binaries
-copy_from=
+copy_from=${CHALK_COPY_FROM:-}
 # chalk command timeout
-timeout=60
+timeout=${CHALK_TIMEOUT:-60}
 # which platforms to download for multi-platform builds
-platforms=
+platforms=${CHALK_PLATFORMS:-}
 # information for signing
 password=${CHALK_PASSWORD:-}
-public_key=
-private_key=
+public_key=${CHALK_PUBLIC_KEY:-}
+private_key=${CHALK_PRIVATE_KEY:-}
 
 color() {
     (
@@ -125,7 +125,7 @@ enable_debug() {
 # wrapper for calling chalk within the script
 chalk() {
     $SUDO chmod +xr "$chalk_path"
-    timeout -s KILL "${timeout}s" $SUDO "$chalk_path" --log-level=$log_level --skip-summary-report --skip-command-report "$@"
+    timeout -s KILL "${timeout}s" $SUDO "$chalk_path" --log-level="$log_level" --skip-summary-report --skip-command-report "$@"
 }
 
 # find out latest chalk version
