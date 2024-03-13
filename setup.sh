@@ -52,6 +52,8 @@ platforms=${CHALK_PLATFORMS:-}
 password=${CHALK_PASSWORD:-}
 public_key=${CHALK_PUBLIC_KEY:-}
 private_key=${CHALK_PRIVATE_KEY:-}
+# run chalk setup
+setup=${CHALK_SETUP:-}
 
 color() {
     (
@@ -373,6 +375,8 @@ Args:
 --public-key=*      Path to signing public key.
 --private-key=*     Path to signing private key encrypted with
                     CHALK_PASSWORD env var.
+--setup             Run chalk setup. Also setup automatically runs
+                    if --public-key and --private-key are provided.
 
 Args for debugging:
 
@@ -411,6 +415,9 @@ for arg; do
             ;;
         --debug)
             enable_debug
+            ;;
+        --setup)
+            setup=true
             ;;
         --overwrite)
             overwrite=true
@@ -505,6 +512,9 @@ fi
 if [ -n "$password" ] && [ -f "$public_key" ] && [ -f "$private_key" ]; then
     info "Loading signing keys into chalk"
     copy_keys
+    chalk setup
+elif [ -n "$setup" ]; then
+    info "Setting up chalk attestation"
     chalk setup
 fi
 

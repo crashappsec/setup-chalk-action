@@ -121,7 +121,6 @@ runs:
           exit 1
         )
         echo "::add-mask::$(cat chalk.jwt)"
-        echo "chalk_token=$(cat chalk.jwt)" >> $GITHUB_OUTPUT
 
     - name: Set up chalk
       if: runner.os == 'Linux' || runner.os == 'macOS'
@@ -134,6 +133,7 @@ runs:
           --params='${{ inputs.params }}' \
           --token="$(cat chalk.jwt 2> /dev/null)" \
           --prefix=$HOME/.chalk \
+          ${{ inputs.connect == 'true' && '--setup' || '' }} \
           ${{ inputs.public_key != '' && format('--public-key={0}/chalk.pub', github.action_path) || '' }} \
           ${{ inputs.private_key != '' && format('--private-key={0}/chalk.key', github.action_path) || '' }} \
           ${{ runner.debug == '1' && '--debug' || '' }}
