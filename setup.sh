@@ -219,7 +219,7 @@ download_platform() {
     if ! [ -f "$chalk_tmp" ]; then
         return 1
     fi
-    arch_path=~/.local/chalk/bin/${os}-${arch}/chalk
+    arch_path=~/.local/chalk/bin/${os}/${arch}/chalk
     info Copying chalk "$os/$arch" to "$arch_path"
     mkdir -p "$(dirname "$arch_path")"
     cp "$chalk_tmp" "$arch_path"
@@ -371,7 +371,8 @@ Args:
                     Default is ${overwrite}.
 --timeout=*         Timeout for chalk commands.
                     Default is ${timeout}.
---platforms=*       Additional platforms to download chalk.
+--platforms=*       Download additional chalk platforms to
+                    ~/.local/chalk/bin/{os}/{arch}/chalk.
 --public-key=*      Path to signing public key.
 --private-key=*     Path to signing private key encrypted with
                     CHALK_PASSWORD env var.
