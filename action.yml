@@ -137,3 +137,18 @@ runs:
           ${{ inputs.public_key != '' && format('--public-key={0}/chalk.pub', github.action_path) || '' }} \
           ${{ inputs.private_key != '' && format('--private-key={0}/chalk.key', github.action_path) || '' }} \
           ${{ runner.debug == '1' && '--debug' || '' }}
+
+    # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow
+    # in some cases chalk needs to auth to GitHub API and it requires
+    # GITHUB_TOKEN env variable to be present
+    # Note that by default this env var is not accessible unless it is accessed
+    # by a secret - either 1) ${{ secrets.GITHUB_TOKEN }} or 2) ${{ github.token }}
+    # However as chalk can be invoked anywhere downstream of this action setting up chalk
+    # (e.g. by calling docker build from docker push action)
+    # we cannot guarantee that GITHUB_TOKEN is going to be accessible at that time
+    # and so we export it here to ensure chalk can succeed with its metadata collection
+    - name: Export GITHUB_TOKEN
+      if: runner.os == 'Linux' || runner.os == 'macOS'
+      shell: bash
+      run: |
+        [ -z "$GITHUB_TOKEN" ] && echo "GITHUB_TOKEN=${{ github.token }}" >> $GITHUB_ENV
