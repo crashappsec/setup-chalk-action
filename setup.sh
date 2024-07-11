@@ -4,7 +4,7 @@ set -eu
 
 # URL_PREFIX=https://crashoverride.com/dl
 URL_PREFIX=https://dl.crashoverride.run
-CONNECT=https://chalkdust.io/connect.c4m
+CONNECT=https://chalkdust.io/connect_no_sbom.c4m
 SHA256=sha256sum
 SUDO=sudo
 TMP=/tmp
