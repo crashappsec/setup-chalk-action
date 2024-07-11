@@ -46,7 +46,6 @@ jobs:
       - name: Setup Chalk
         uses: ./
         with:
-          version: cecbf150e2fe0df7a813a8c4cb2923ba62b1fe40
           password: ${{ env.COSIGN_PASSWORD }}
           public_key: ${{ env.PUBLIC_KEY }}
           private_key: ${{ env.PRIVATE_KEY }}
