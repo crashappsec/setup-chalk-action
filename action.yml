@@ -125,13 +125,12 @@ runs:
     - name: Set up chalk
       if: runner.os == 'Linux' || runner.os == 'macOS'
       shell: bash
-      working-directory: ${{ github.action_path }}
       run: |
-        ./setup.sh \
+        ${{ github.action_path }}/setup.sh \
           --version='${{ inputs.version }}' \
           --load='${{ inputs.load }}' \
           --params='${{ inputs.params }}' \
-          --token="$(cat chalk.jwt 2> /dev/null)" \
+          --token="$(cat ${{ github.action_path }}/chalk.jwt 2> /dev/null)" \
           --prefix=$HOME/.chalk \
           ${{ inputs.connect == 'true' && '--setup' || '' }} \
           ${{ inputs.public_key != '' && format('--public-key={0}/chalk.pub', github.action_path) || '' }} \
