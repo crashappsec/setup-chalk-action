@@ -8,6 +8,7 @@ inputs:
       By default latest version is installed.
       See https://crashoverride.com/releases for all available versions.
     required: false
+    default: latest
   load:
     description: |
       Chalk config(s) to load - comma or new-line delimited.
@@ -23,7 +24,9 @@ inputs:
   connect:
     description: |
       Whether to automatically connect to https://crashoverride.run.
-      If true, will load https://chalkdust.io/connect.c4m.
+    required: false
+  profile:
+    description: Key of the custom CrashOverride profile to load.
     required: false
   token:
     description: |
@@ -49,6 +52,20 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Hide provided JWT token
+      if: inputs.token != ''
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: |
+        echo "::add-mask::${{ inputs.token }}"
+
+    - name: Hide provided password
+      if: inputs.password != ''
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: |
+        echo "::add-mask::${{ inputs.password }}"
+
     # https://docs.sigstore.dev/system_config/installation/
     - name: Install cosign
       if: runner.os == 'Linux' || runner.os == 'macOS'
@@ -84,44 +101,6 @@ runs:
       run: |
         printenv CHALK_PRIVATE_KEY > chalk.key
 
-    - name: Save provided JWT token
-      if: (runner.os == 'Linux' || runner.os == 'macOS') && inputs.token != ''
-      shell: bash
-      working-directory: ${{ github.action_path }}
-      run: |
-        echo "${{ inputs.token }}" > chalk.jwt
-
-    - name: Get JWT by using GitHub OpenId Connect
-      if: (runner.os == 'Linux' || runner.os == 'macOS') && inputs.connect != '' && inputs.connect != 'false' && inputs.token == ''
-      shell: bash
-      working-directory: ${{ github.action_path }}
-      run: |
-        curl \
-          --fail \
-          --silent \
-          --header "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-          "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://crashoverride.run" \
-          > github.jwt || (
-          echo "Cannot generate GitHub OpenId Connect JWT Token."
-          echo "Please make sure workflow/job has 'id-token: write' permission."
-          echo "See https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect#adding-permissions-settings"
-          exit 1
-        )
-        curl \
-          --fail \
-          --silent \
-          --request POST \
-          --data-binary @github.jwt \
-          --header 'Content-Type: application/json' \
-          https://chalk.crashoverride.run/v0.1/openid-connect/github \
-          | jq -r '.jwt' \
-          > chalk.jwt || (
-          echo "Could not retrieve Chalk JWT token."
-          echo "Please make sure GitHub integration is configured in your CrashOverride workspace."
-          exit 1
-        )
-        echo "::add-mask::$(cat chalk.jwt)"
-
     - name: Set up chalk
       if: runner.os == 'Linux' || runner.os == 'macOS'
       shell: bash
@@ -130,9 +109,10 @@ runs:
           --version='${{ inputs.version }}' \
           --load='${{ inputs.load }}' \
           --params='${{ inputs.params }}' \
-          --token="$(cat ${{ github.action_path }}/chalk.jwt 2> /dev/null)" \
+          --token='${{ inputs.token }}' \
           --prefix=$HOME/.chalk \
-          ${{ inputs.connect == 'true' && '--setup' || '' }} \
+          --profile='${{ inputs.profile }}' \
+          ${{ inputs.connect == 'true' && '--connect' || '' }} \
           ${{ inputs.public_key != '' && format('--public-key={0}/chalk.pub', github.action_path) || '' }} \
           ${{ inputs.private_key != '' && format('--private-key={0}/chalk.key', github.action_path) || '' }} \
           ${{ runner.debug == '1' && '--debug' || '' }}

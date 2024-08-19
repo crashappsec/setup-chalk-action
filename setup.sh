@@ -4,7 +4,8 @@ set -eu
 
 # URL_PREFIX=https://crashoverride.com/dl
 URL_PREFIX=https://dl.crashoverride.run
-CONNECT=https://chalkdust.io/connect.c4m
+OPENID_CONNECT=https://chalk-test.crashoverride.run/v0.1/openid-connect/github
+PROFILE=https://chalk-test.crashoverride.run/v0.1/profile
 SHA256=sha256sum
 SUDO=sudo
 TMP=/tmp
@@ -24,11 +25,15 @@ if ! is_installed sudo; then
 fi
 
 # version of chalk to download
-version=${CHALK_VERSION:-}
+version=${CHALK_VERSION:-latest}
 # which config to load after install
 load=${CHALK_LOAD:-}
 # json params to load
 params=${CHALK_PARAMS:-}
+# whether to automatically determine token via openid connect
+connect=${CHALK_CONNECT:-}
+# name of the custom profile to load
+profile=${CHALK_PROFILE:-default}
 # CrashOverride API token
 token=${CHALK_TOKEN:-}
 # ${prefix}/bin is where script should install chalk and wrapped commands
@@ -118,16 +123,123 @@ am_owner() {
     [ "$uid" = "$path_uid" ]
 }
 
+header_value() {
+    file=$1
+    name=$2
+    grep -i "$name" < "$file" | awk '{print $2}' | tr -d '\r\n' \
+        || (
+            fatal Could not find header "$name" from response
+        )
+}
+
 enable_debug() {
     set -x
     log_level=trace
     debug=true
 }
 
+openid_connect_github() {
+    info Authenticating to CrashOverride via GitHub OpenID Connect
+    github_jwt=$(mktemp -t github_jwt.XXXXXX)
+    curl \
+        --fail \
+        --show-error \
+        --silent \
+        --location \
+        --header "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+        "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://crashoverride.run" \
+        > "$github_jwt" \
+        || (
+            error Cannot generate GitHub OpenId Connect JWT Token.
+            error Please make sure workflow/job has "'id-token: write'" permission.
+            fatal See https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect#adding-permissions-settings
+        )
+    co_headers=$(mktemp -t co_jwt.XXXXXX)
+    curl \
+        --fail \
+        --show-error \
+        --silent \
+        --location \
+        --request POST \
+        --header 'Content-Type: application/json' \
+        --data-binary @"$github_jwt" \
+        --dump-header "$co_headers" \
+        $OPENID_CONNECT \
+        > /dev/null \
+        || (
+            error Could not retrieve Chalk JWT token from GitHub OpenID Connect JWT.
+            fatal Please make sure GitHub integration is configured in your CrashOverride workspace.
+        )
+    # grabbing token from headers to avoid dependency on jq
+    token=$(header_value "$co_headers" x-chalk-jwt)
+    echo "::add-mask::$token"
+}
+
+token_via_openid_connect() {
+    if [ -n "$CI" ] && [ -n "$GITHUB_SHA" ] && [ -n "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" ]; then
+        openid_connect_github
+    else
+        fatal Not supported CI system to use OpenID Connect to get CrashOverride JWT token. Pass --token explicitly.
+    fi
+}
+
+load_custom_profile() {
+    info Loading custom Chalk profile from CrashOverride
+    headers=$(mktemp -t co_headers.XXXXXX)
+    result=$(mktemp -t co_respose.XXXXXX)
+    curl \
+        --fail \
+        --show-error \
+        --silent \
+        --location \
+        --request POST \
+        --header "Authorization: bearer $token" \
+        --dump-header "$headers" \
+        "$PROFILE?chalkVersion=$(chalk_version)&chalkProfileKey=$profile" \
+        > "$result" \
+        || (
+            error Could not retrieve custom Chalk profile.
+            fatal "$(cat "$result")"
+        )
+    # grabbing token from headers to avoid dependency on jq
+    component_url=$(header_value "$headers" x-chalk-component-url)
+    parameters_url=$(header_value "$headers" x-chalk-component-parameters-url)
+    component=$(mktemp -t co_component_XXXXXX).c4m
+    parameters=$(mktemp -t co_params_XXXXXX).json
+    curl \
+        --fail \
+        --show-error \
+        --silent \
+        --location \
+        "$component_url" \
+        > "$component" \
+        || (
+            error Could not retrieve custom Chalk profile component.
+            fatal "$(cat "$component")"
+        )
+    curl \
+        --fail \
+        --show-error \
+        --silent \
+        --location \
+        --header 'Accept: application/json' \
+        "$parameters_url" \
+        > "$parameters" \
+        || (
+            error Could not retrieve custom Chalk profile component parameters.
+            fatal "$(cat "$parameters")"
+        )
+    params=- load_config "$component" < "$parameters"
+}
+
 # wrapper for calling chalk within the script
 chalk() {
     $SUDO chmod +xr "$chalk_path"
     timeout -s KILL "${timeout}s" $SUDO "$chalk_path" --log-level="$log_level" --skip-summary-report --skip-command-report "$@"
+}
+
+chalk_version() {
+    log_level=none chalk version | grep -i version | head -n1 | awk '{print $5}'
 }
 
 # find out latest chalk version
@@ -236,32 +348,18 @@ normalize_cosign() {
 
 # load custom chalk config
 load_config() {
-    module="${load%.*}"
-    if [ -z "$params" ] && [ -n "$token" ] && [ "$load" = "$CONNECT" ]; then
-        params="[[true, \"$module\", \"auth_config.crashoverride.token\", \"string\", \"$token\"]]"
-    fi
-    if [ -n "$params" ]; then
-        echo "$params" | chalk load "$load" --params
+    to_load=$1
+    if [ "$params" = "-" ]; then
+        chalk load "$to_load" --params
+    elif [ -n "$params" ]; then
+        echo "$params" | chalk load "$to_load" --params
     else
-        chalk load "$load"
+        chalk load "$to_load"
     fi
     if [ -n "$debug" ]; then
         chalk dump
         chalk dump cache
     fi
-}
-
-# add line to config file if its not there already
-add_line_to_config() {
-    line=$1
-    config=$2
-    if grep "$line" "$config" > /dev/null 2>&1; then
-        info "$line" is already configured in chalk config
-        return 0
-    fi
-    info Adding "'$line'" to chalk config
-    echo >> "$config"
-    echo "$line" >> "$config"
 }
 
 # add lines to chalk config
@@ -356,8 +454,13 @@ Args:
 --load=*            Comma/newline delimited paths/URLs
                     of chalk components to load.
 --params=*          JSON of component params to load.
+                    Can be "-" to read params from stdin.
+--connect           Automatically connect to CrashOverride
+                    via OpenID Connect
+                    (supports only some CI systems).
+--profile=*         Name of the custom CrashOverride
+                    to load. Default is 'default'.
 --token=*           CrashOverride JWT token to load.
-                    Mutually-exclusive with --params.
 --prefix=*          Where to install chalk and related
                     binaries. Default is ${prefix}.
 --chalk-path=*      Exact path where to install chalk.
@@ -395,6 +498,12 @@ for arg; do
             ;;
         --load=*)
             load=${arg##*=}
+            ;;
+        --connect)
+            connect=true
+            ;;
+        --profile=*)
+            profile=${arg##*=}
             ;;
         --token=*)
             token=${arg##*=}
@@ -452,14 +561,6 @@ for arg; do
     esac
 done
 
-if [ -n "$token" ] && ! echo "$load" | grep "$CONNECT"; then
-    load="$CONNECT,$load"
-fi
-
-if [ "${ACTIONS_STEP_DEBUG:-}" = "true" ]; then
-    enable_debug
-fi
-
 if ! echo "$PATH" | tr ":" "\n" | grep "$prefix/bin"; then
     fatal "$prefix/bin" is not part of PATH. "--prefix=<prefix>/bin" must be part of PATH
 fi
@@ -475,12 +576,20 @@ else
     fi
 fi
 
+if [ "${ACTIONS_STEP_DEBUG:-}" = "true" ]; then
+    enable_debug
+fi
+
+if [ -z "$token" ] && [ -n "$connect" ]; then
+    token_via_openid_connect
+fi
+
 if ! [ -f "$chalk_path" ] || [ -n "$overwrite" ]; then
     if [ -f "$chalk_path" ]; then
         info "$chalk_path" is already installed. overwriting
     fi
 
-    if [ -z "$version" ]; then
+    if [ -z "$version" ] || [ "$version" = "latest" ]; then
         version=$(get_latest_version)
     fi
 
@@ -497,24 +606,28 @@ for platform in $(echo "$platforms" | tr "," "\n"); do
     )
 done
 
+if [ -n "$token" ]; then
+    load_custom_profile
+fi
+
 for i in $(echo "$load" | tr "," "\n" | tr " " "\n"); do
     if [ -z "$i" ]; then
         continue
     fi
     info Loading custom chalk config from "$i"
-    load=$i load_config
+    load_config "$i"
 done
 
 if [ -n "$debug" ]; then
     info Debug mode is enabled. Changing default chalk log level to trace
-    params='' token='' load=https://chalkdust.io/debug.c4m load_config
+    params='' load_config https://chalkdust.io/debug.c4m
 fi
 
 if [ -n "$password" ] && [ -f "$public_key" ] && [ -f "$private_key" ]; then
     info "Loading signing keys into chalk"
     copy_keys
     chalk setup
-elif [ -n "$setup" ]; then
+elif [ -n "$setup" ] || [ -n "$token" ]; then
     info "Setting up chalk attestation"
     chalk setup
 fi
