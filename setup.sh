@@ -276,13 +276,13 @@ download_chalk() {
     chalk_tmp=$TMP/$(chalk_version_name)
 
     if [ -n "$copy_from" ]; then
-        info Copying existing chalk from "$copy_from"
+        info Copying existing Chalk from "$copy_from"
         cp "$copy_from" "$TMP/$name"
         return
     fi
 
     url=$URL_PREFIX/$(chalk_folder)/$name
-    info Downloading chalk from "$url"
+    info Downloading Chalk from "$url"
     rm -f "$TMP/$name" "$TMP/$name.sha256"
     wget --quiet --directory-prefix=$TMP "$url" "$url.sha256" || (
         fatal Could not download "$name". Are you sure this is a valid version?
@@ -299,17 +299,17 @@ download_chalk() {
             cat "$chalk_tmp.sha256" > /dev/stderr
             error Downloaded checksum:
             $SHA256 "$chalk_tmp" > /dev/stderr
-            fatal Oh no. Checksum validation failed. Exiting as chalk binary might of been tampered with
+            fatal Oh no. Checksum validation failed. Exiting as Chalk binary might of been tampered with
         )
     )
 }
 
-# validate downloaded chalk can run on the system
+# validate downloaded Chalk can run on the system
 # and then install it to $chalk_path which should be on PATH
 install_chalk() {
-    info Checking chalk version
+    info Checking Chalk version
     chalk_path=$chalk_tmp chalk version
-    info Installing chalk to "$chalk_path"
+    info Installing Chalk to "$chalk_path"
     $SUDO mkdir -p "$(dirname "$chalk_path")"
     $SUDO cp "$chalk_tmp" "$chalk_path"
     $SUDO chmod +xr "$chalk_tmp"
@@ -332,7 +332,7 @@ download_platform() {
         return 1
     fi
     arch_path=~/.local/chalk/bin/${os}/${arch}/chalk
-    info Copying chalk "$os/$arch" to "$arch_path"
+    info Copying Chalk "$os/$arch" to "$arch_path"
     mkdir -p "$(dirname "$arch_path")"
     cp "$chalk_tmp" "$arch_path"
     chmod +xr "$arch_path"
@@ -341,12 +341,12 @@ download_platform() {
 normalize_cosign() {
     if is_installed cosign; then
         # TODO fix in src/configs/attestation.c4m
-        info Copying cosign to /tmp for chalk
+        info Copying cosign to /tmp for Chalk
         cp "$(which cosign)" /tmp/cosign
     fi
 }
 
-# load custom chalk config
+# load custom Chalk config
 load_config() {
     to_load=$1
     if [ "$params" = "-" ]; then
@@ -362,7 +362,7 @@ load_config() {
     fi
 }
 
-# add lines to chalk config
+# add lines to Chalk config
 add_lines_to_chalk() {
     name=$1
     shift
@@ -378,7 +378,7 @@ add_lines_to_chalk() {
     fi
 }
 
-# add necessary configs to wrap command with chalk
+# add necessary configs to wrap command with Chalk
 add_cmd_exe_to_config() {
     cmd=$1
     path=$2
@@ -389,7 +389,7 @@ add_cmd_exe_to_config() {
         "${cmd}_exe = \"$folder\""
 }
 
-# wrap given command with chalk
+# wrap given command with Chalk
 wrap_cmd() {
     cmd=$1
 
@@ -406,7 +406,7 @@ wrap_cmd() {
         return 0
     fi
 
-    info Wrapping "$existing_path" command with chalk
+    info Wrapping "$existing_path" command with Chalk
 
     $SUDO mkdir -p "$(dirname "$chalkless_path")"
     if am_owner "$existing_path"; then
@@ -419,15 +419,15 @@ wrap_cmd() {
         $SUDO cp "$existing_path" "$chalkless_path"
     fi
 
-    # create temporary chalk copy so that we can adjust its configuration
+    # create temporary Chalk copy so that we can adjust its configuration
     # to be able to find the moved binary in the chalkless location
-    info Wrapping "$chalked_path" with chalk
+    info Wrapping "$chalked_path" with Chalk
     tmp=$(mktemp -t chalk.XXXXXX)
     $SUDO cp "$chalk_path" "$tmp"
     chalk_path=$tmp add_cmd_exe_to_config "$cmd" "$chalkless_path"
     $SUDO rm "$chalked_path" 2> /dev/null || true
     $SUDO cp "$tmp" "$chalked_path"
-    info Using "$chalked_path" will automatically use chalk now
+    info Using "$chalked_path" will automatically use Chalk now
 }
 
 copy_keys() {
@@ -437,7 +437,7 @@ copy_keys() {
 
 help() {
     cat << EOF
-Setup chalk:
+Setup Chalk:
 
 * Downloads binary
 * Verifies checksum
@@ -452,7 +452,7 @@ Args:
 --version=*         Chalk version/commit to download.
                     By default latest version is used.
 --load=*            Comma/newline delimited paths/URLs
-                    of chalk components to load.
+                    of Chalk components to load.
 --params=*          JSON of component params to load.
                     Can be "-" to read params from stdin.
 --connect           Automatically connect to CrashOverride
@@ -461,30 +461,30 @@ Args:
 --profile=*         Name of the custom CrashOverride
                     to load. Default is 'default'.
 --token=*           CrashOverride JWT token to load.
---prefix=*          Where to install chalk and related
+--prefix=*          Where to install Chalk and related
                     binaries. Default is ${prefix}.
---chalk-path=*      Exact path where to install chalk.
+--chalk-path=*      Exact path where to install Chalk.
                     Default is $(get_chalk_path).
 --no-wrap=*         Do not wrap supported binaries.
 --debug             Enable debug mode. This enables trace
-                    logs for installed chalk and will
+                    logs for installed Chalk and will
                     run setup script in verbose mode.
---[no-]overwrite    Whether to overwrite chalk binary
+--[no-]overwrite    Whether to overwrite Chalk binary
                     if $(get_chalk_path) already exists.
                     Default is ${overwrite}.
---timeout=*         Timeout for chalk commands.
+--timeout=*         Timeout for Chalk commands.
                     Default is ${timeout}.
---platforms=*       Download additional chalk platforms to
+--platforms=*       Download additional Chalk platforms to
                     ~/.local/chalk/bin/{os}/{arch}/chalk.
 --public-key=*      Path to signing public key.
 --private-key=*     Path to signing private key encrypted with
                     CHALK_PASSWORD env var.
---setup             Run chalk setup. Also setup automatically runs
+--setup             Run Chalk setup. Also setup automatically runs
                     if --public-key and --private-key are provided.
 
 Args for debugging:
 
---copy-from=*       Instead of downloading chalk binary
+--copy-from=*       Instead of downloading Chalk binary
                     copy it from this path instead.
 EOF
     exit "${1:-0}"
@@ -614,21 +614,21 @@ for i in $(echo "$load" | tr "," "\n" | tr " " "\n"); do
     if [ -z "$i" ]; then
         continue
     fi
-    info Loading custom chalk config from "$i"
+    info Loading custom Chalk config from "$i"
     load_config "$i"
 done
 
 if [ -n "$debug" ]; then
-    info Debug mode is enabled. Changing default chalk log level to trace
+    info Debug mode is enabled. Changing default Chalk log level to trace
     params='' load_config https://chalkdust.io/debug.c4m
 fi
 
 if [ -n "$password" ] && [ -f "$public_key" ] && [ -f "$private_key" ]; then
-    info "Loading signing keys into chalk"
+    info "Loading signing keys into Chalk"
     copy_keys
     chalk setup
 elif [ -n "$setup" ] || [ -n "$token" ]; then
-    info "Setting up chalk attestation"
+    info "Setting up Chalk attestation"
     chalk setup
 fi
 

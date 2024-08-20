@@ -37,17 +37,17 @@ jobs:
 
 The following parameters can be provided to the action.
 
-| Name          | Type    | Description                                                                                                                                     |
-| ------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `version`     | String  | Version of chalk to install. By default latest version is installed. See [releases] for all available versions.                                 |
-| `load`        | String  | Chalk config(s) to load - comma or new-line delimited. Can be either paths to files or URLs.                                                    |
-| `params`      | String  | Chalk components params to load. Should be JSON array with all parameter values. JSON structure is the same as provided by `chalk dump params`. |
-| `connect`     | Boolean | Whether to automatically connect to https://crashoverride.run.                                                                                  |
-| `profile`     | String  | Key of the custom CrashOverride profile to load.                                                                                                |
-| `token`       | String  | CrashOverride API Token. Get your API token at [CrashOverride]                                                                                  |
-| `password`    | String  | Password for chalk signing key. Password is displayed as part of `chalk setup`.                                                                 |
-| `public_key`  | String  | Content of chalk signing public key). Copy from `chalk.pub` after `chalk setup`.                                                                |
-| `private_key` | String  | Content of chalk signing encrypted private key (with the provided password). Copy from `chalk.key` after `chalk setup`.                         |
+| Name          | Type    | Default   | Description                                                                                                                                     |
+| ------------- | ------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `version`     | String  | `latest`  | Version of chalk to install. By default latest version is installed. See [releases] for all available versions.                                 |
+| `load`        | String  |           | Chalk config(s) to load - comma or new-line delimited. Can be either paths to files or URLs.                                                    |
+| `params`      | String  |           | Chalk components params to load. Should be JSON array with all parameter values. JSON structure is the same as provided by `chalk dump params`. |
+| `connect`     | Boolean | `false`   | Whether to automatically connect to https://crashoverride.run.                                                                                  |
+| `profile`     | String  | `default` | Key of the custom CrashOverride profile to load.                                                                                                |
+| `token`       | String  |           | CrashOverride API Token. It is automatically fetched via OpenID connect if not provided when `connect=true`.                                    |
+| `password`    | String  |           | Password for chalk signing key. Password is displayed as part of `chalk setup`.                                                                 |
+| `public_key`  | String  |           | Content of chalk signing public key). Copy from `chalk.pub` after `chalk setup`.                                                                |
+| `private_key` | String  |           | Content of chalk signing encrypted private key (with the provided password). Copy from `chalk.key` after `chalk setup`.                         |
 
 For example:
 
@@ -57,6 +57,7 @@ For example:
   with:
     version: 0.4.11
     connect: true
+    profile: myprofile
     load: https://chalkdust.io/debug.c4m
     password: ${{ secrets.CHALK_PASSWORD }}
     public_key: ${{ secrets.CHALK_PUBLIC_KEY }}

@@ -28,10 +28,11 @@ inputs:
   profile:
     description: Key of the custom CrashOverride profile to load.
     required: false
+    default: profile
   token:
     description: |
       CrashOverride API Token.
-      Get your API token at CrashOverride: https://crashoverride.run
+      It is automatically fetched via OpenID connect if not provided when `connect=true`.                                    |
     required: false
   password:
     description: |
