@@ -4,8 +4,8 @@ set -eu
 
 # URL_PREFIX=https://crashoverride.com/dl
 URL_PREFIX=https://dl.crashoverride.run
-OPENID_CONNECT=https://chalk-test.crashoverride.run/v0.1/openid-connect/github
-PROFILE=https://chalk-test.crashoverride.run/v0.1/profile
+OPENID_CONNECT=https://chalk.crashoverride.run/v0.1/openid-connect/github
+PROFILE=https://chalk.crashoverride.run/v0.1/profile
 SHA256=sha256sum
 SUDO=sudo
 TMP=/tmp
