@@ -28,7 +28,7 @@ inputs:
   profile:
     description: Key of the custom CrashOverride profile to load.
     required: false
-    default: profile
+    default: default
   token:
     description: |
       CrashOverride API Token.
