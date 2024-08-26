@@ -2,64 +2,6 @@
 
 set -eu
 
-# URL_PREFIX=https://crashoverride.com/dl
-URL_PREFIX=https://dl.crashoverride.run
-OPENID_CONNECT=https://chalk.crashoverride.run/v0.1/openid-connect/github
-PROFILE=https://chalk.crashoverride.run/v0.1/profile
-SHA256=sha256sum
-SUDO=sudo
-TMP=/tmp
-
-is_installed() {
-    name=$1
-    which "$name" > /dev/null 2>&1
-}
-
-# on osx, sha256sum doesnt exist and instead its shasum
-if ! is_installed "$SHA256"; then
-    SHA256="shasum -a 256"
-fi
-
-if ! is_installed sudo; then
-    SUDO=
-fi
-
-# version of chalk to download
-version=${CHALK_VERSION:-latest}
-# which config to load after install
-load=${CHALK_LOAD:-}
-# json params to load
-params=${CHALK_PARAMS:-}
-# whether to automatically determine token via openid connect
-connect=${CHALK_CONNECT:-}
-# name of the custom profile to load
-profile=${CHALK_PROFILE:-default}
-# CrashOverride API token
-token=${CHALK_TOKEN:-}
-# ${prefix}/bin is where script should install chalk and wrapped commands
-prefix=${CHALK_PREFIX:-/usr/local}
-# whether to overwrite existing chalk binary
-overwrite=${CHALK_OVERWRITE:-true}
-# whether to wrap external commands with chalk
-wrap=${CHALK_WRAP:-true}
-# chalk commands log level
-log_level=${CHALK_LOG_LEVEL:-error}
-# if running in debug mode
-debug=${CHALK_DEBUG:-}
-# instead of downloading chalk, copy it from this path
-# this is meant for testing local chalk binaries
-copy_from=${CHALK_COPY_FROM:-}
-# chalk command timeout
-timeout=${CHALK_TIMEOUT:-60}
-# which platforms to download for multi-platform builds
-platforms=${CHALK_PLATFORMS:-}
-# information for signing
-password=${CHALK_PASSWORD:-}
-public_key=${CHALK_PUBLIC_KEY:-}
-private_key=${CHALK_PRIVATE_KEY:-}
-# run chalk setup
-setup=${CHALK_SETUP:-}
-
 color() {
     (
         set +x
@@ -105,6 +47,73 @@ fatal() {
     error "$@"
     exit 1
 }
+
+is_installed() {
+    name=$1
+    which "$name" > /dev/null 2>&1
+}
+
+# version of chalk to download
+version=${CHALK_VERSION:-latest}
+# which config to load after install
+load=${CHALK_LOAD:-}
+# json params to load
+params=${CHALK_PARAMS:-}
+# whether to automatically determine token via openid connect
+connect=${CHALK_CONNECT:-}
+# name of the custom profile to load
+profile=${CHALK_PROFILE:-default}
+# CrashOverride API token
+token=${CHALK_TOKEN:-}
+# OIDC token used to retrieve chalk token
+oidc=${CHALK_OIDC:-}
+# ${prefix}/bin is where script should install chalk and wrapped commands
+prefix=${CHALK_PREFIX:-/usr/local}
+# whether to overwrite existing chalk binary
+overwrite=${CHALK_OVERWRITE:-true}
+# whether to wrap external commands with chalk
+wrap=${CHALK_WRAP:-true}
+# chalk commands log level
+log_level=${CHALK_LOG_LEVEL:-error}
+# if running in debug mode
+debug=${CHALK_DEBUG:-}
+# instead of downloading chalk, copy it from this path
+# this is meant for testing local chalk binaries
+copy_from=${CHALK_COPY_FROM:-}
+# chalk command timeout
+timeout=${CHALK_TIMEOUT:-60}
+# which platforms to download for multi-platform builds
+platforms=${CHALK_PLATFORMS:-}
+# information for signing
+password=${CHALK_PASSWORD:-}
+public_key=${CHALK_PUBLIC_KEY:-}
+private_key=${CHALK_PRIVATE_KEY:-}
+# run chalk setup
+setup=${CHALK_SETUP:-}
+
+URL_PREFIX=https://dl.crashoverride.run
+SHA256=sha256sum
+SUDO=sudo
+TMP=/tmp
+
+# on osx, sha256sum doesnt exist and instead its shasum
+if ! is_installed "$SHA256"; then
+    SHA256="shasum -a 256"
+fi
+
+if ! is_installed sudo; then
+    SUDO=
+fi
+
+PROFILE=https://chalk.crashoverride.run/v0.1/profile
+GITHUB_OPENID_CONNECT=https://chalk.crashoverride.run/v0.1/openid-connect/github
+GITLAB_OPENID_CONNECT=https://chalk.crashoverride.run/v0.1/openid-connect/gitlab
+if [ -n "${__CHALK_TESTING__:-}" ]; then
+    warn Beware - chalk is now using test environment which is meant for internal chalk testing only.
+    PROFILE=https://chalk-test.crashoverride.run/v0.1/profile
+    GITHUB_OPENID_CONNECT=https://chalk-test.crashoverride.run/v0.1/openid-connect/github
+    GITLAB_OPENID_CONNECT=https://chalk-test.crashoverride.run/v0.1/openid-connect/gitlab
+fi
 
 first_owner() {
     path=$1
@@ -164,7 +173,7 @@ openid_connect_github() {
         --header 'Content-Type: application/json' \
         --data-binary @"$github_jwt" \
         --dump-header "$co_headers" \
-        $OPENID_CONNECT \
+        $GITHUB_OPENID_CONNECT \
         > /dev/null \
         || (
             error Could not retrieve Chalk JWT token from GitHub OpenID Connect JWT.
@@ -175,9 +184,44 @@ openid_connect_github() {
     echo "::add-mask::$token"
 }
 
+openid_connect_gitlab() {
+    if [ -z "$oidc" ]; then
+        error GitLab OpenID Connect token is missing.
+        error Ensure GitLab job defines id token:
+        cat << EOF
+<job>:
+  id_tokens:
+    CHALK_OIDC:
+      aud: https://crashoverride.run
+EOF
+        fatal See https://docs.gitlab.com/ee/ci/secrets/id_token_authentication.html
+    fi
+    info Authenticating to CrashOverride via GitLab OpenID Connect
+    co_headers=$(mktemp -t co_jwt.XXXXXX)
+    curl \
+        --fail \
+        --show-error \
+        --silent \
+        --location \
+        --request POST \
+        --header 'Content-Type: application/json' \
+        --header "Authorization: bearer $oidc" \
+        --dump-header "$co_headers" \
+        $GITLAB_OPENID_CONNECT \
+        > /dev/null \
+        || (
+            error Could not retrieve Chalk JWT token from GitLab OpenID Connect JWT.
+            fatal Please make sure GitLab integration is configured in your CrashOverride workspace.
+        )
+    # grabbing token from headers to avoid dependency on jq
+    token=$(header_value "$co_headers" x-chalk-jwt)
+}
+
 token_via_openid_connect() {
-    if [ -n "$CI" ] && [ -n "$GITHUB_SHA" ] && [ -n "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" ]; then
+    if [ -n "${CI:-}" ] && [ -n "${GITHUB_SHA:-}" ] && [ -n "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
         openid_connect_github
+    elif [ -n "${CI:-}" ] && [ -n "${GITLAB_CI:-}" ]; then
+        openid_connect_gitlab
     else
         fatal Not supported CI system to use OpenID Connect to get CrashOverride JWT token. Pass --token explicitly.
     fi
@@ -460,7 +504,9 @@ Args:
                     (supports only some CI systems).
 --profile=*         Name of the custom CrashOverride
                     to load. Default is 'default'.
---token=*           CrashOverride JWT token to load.
+--token=*           CrashOverride API JWT token.
+--oidc=*            OpenID Connect OIDC token to retrieve
+                    CrashOverride JWT token.
 --prefix=*          Where to install Chalk and related
                     binaries. Default is ${prefix}.
 --chalk-path=*      Exact path where to install Chalk.
@@ -508,6 +554,11 @@ for arg; do
         --token=*)
             token=${arg##*=}
             token=$(echo "$token" | tr -d '\n')
+            ;;
+        --oidc=*)
+            oidc=${arg##*=}
+            oidc=$(echo "$oidc" | tr -d '\n')
+            connect=true
             ;;
         --params=*)
             params=${arg##*=}
@@ -561,7 +612,7 @@ for arg; do
     esac
 done
 
-if ! echo "$PATH" | tr ":" "\n" | grep "$prefix/bin"; then
+if ! echo "$PATH" | tr ":" "\n" | grep "$prefix/bin" > /dev/null; then
     fatal "$prefix/bin" is not part of PATH. "--prefix=<prefix>/bin" must be part of PATH
 fi
 
@@ -580,7 +631,7 @@ if [ "${ACTIONS_STEP_DEBUG:-}" = "true" ]; then
     enable_debug
 fi
 
-if [ -z "$token" ] && [ -n "$connect" ]; then
+if [ -z "$token" ] && { [ -n "$connect" ] || [ -n "$oidc" ]; }; then
     token_via_openid_connect
 fi
 
