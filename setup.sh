@@ -494,13 +494,13 @@ Args:
 
 -h / --help         Show this message
 --version=*         Chalk version/commit to download.
-                    By default latest version is used.
+                    Default is '${version}'.
 --load=*            Comma/newline delimited paths/URLs
                     of Chalk components to load.
 --params=*          JSON of component params to load.
                     Can be "-" to read params from stdin.
 --profile=*         Name of the custom CrashOverride profile
-                    to load. Default is 'default'.
+                    to load. Default is '${profile}'.
 --connect           Automatically connect to CrashOverride
                     via OpenID Connect OIDC.
                     Currently supports:
@@ -513,20 +513,22 @@ Args:
 --token=*           CrashOverride API token when OpenID Connect
                     cannot be used.
 --prefix=*          Where to install Chalk and related
-                    binaries. Default is ${prefix}.
+                    binaries. Default is '${prefix}'.
 --chalk-path=*      Exact path where to install Chalk.
-                    Default is $(get_chalk_path).
+                    Default is '$(get_chalk_path)'.
 --no-wrap=*         Do not wrap supported binaries.
 --debug             Enable debug mode. This enables trace
                     logs for installed Chalk and will
                     run setup script in verbose mode.
 --[no-]overwrite    Whether to overwrite Chalk binary
-                    if $(get_chalk_path) already exists.
-                    Default is ${overwrite}.
---timeout=*         Timeout for Chalk commands.
-                    Default is ${timeout}.
+                    if '$(get_chalk_path)' already exists.
+                    Default is '${overwrite}'.
+--timeout=*         Timeout for Chalk commands (in seconds).
+                    Default is '${timeout}.
 --platforms=*       Download additional Chalk platforms to
-                    ~/.local/chalk/bin/{os}/{arch}/chalk.
+                    '~/.local/chalk/bin/{os}/{arch}/chalk'.
+                    Same notation as docker platform syntax
+                    of '{os}/{arch}'.
 --public-key=*      Path to signing public key.
 --private-key=*     Path to signing private key encrypted with
                     CHALK_PASSWORD env var.
