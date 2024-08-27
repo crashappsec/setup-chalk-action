@@ -499,14 +499,19 @@ Args:
                     of Chalk components to load.
 --params=*          JSON of component params to load.
                     Can be "-" to read params from stdin.
---connect           Automatically connect to CrashOverride
-                    via OpenID Connect
-                    (supports only some CI systems).
---profile=*         Name of the custom CrashOverride
+--profile=*         Name of the custom CrashOverride profile
                     to load. Default is 'default'.
---token=*           CrashOverride API JWT token.
---oidc=*            OpenID Connect OIDC token to retrieve
-                    CrashOverride JWT token.
+--connect           Automatically connect to CrashOverride
+                    via OpenID Connect OIDC.
+                    Currently supports:
+                    * GitHub (requires id-token: write permission)
+--oidc=*            When --connect cannot automatically generate
+                    OpenID Connect token, OIDC token can be passed
+                    directly via a parameter or CHALK_OIDC env var.
+                    Currently supports:
+                    * GitLab (requires using id_tokens)
+--token=*           CrashOverride API token when OpenID Connect
+                    cannot be used.
 --prefix=*          Where to install Chalk and related
                     binaries. Default is ${prefix}.
 --chalk-path=*      Exact path where to install Chalk.
