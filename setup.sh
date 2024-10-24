@@ -248,6 +248,7 @@ load_custom_profile() {
     # grabbing token from headers to avoid dependency on jq
     component_url=$(header_value "$headers" x-chalk-component-url)
     parameters_url=$(header_value "$headers" x-chalk-component-parameters-url)
+    run_setup=$(header_value "$headers" x-chalk-setup)
     component=$(mktemp -t co_component_XXXXXX).c4m
     parameters=$(mktemp -t co_params_XXXXXX).json
     curl \
@@ -274,6 +275,10 @@ load_custom_profile() {
             fatal "$(cat "$parameters")"
         )
     params=- load_config "$component" < "$parameters"
+    if [ "$run_setup" = "true" ]; then
+        info "Setting up CrashOverride Chalk attestation"
+        chalk setup
+    fi
 }
 
 # wrapper for calling chalk within the script
@@ -685,7 +690,7 @@ if [ -n "$password" ] && [ -f "$public_key" ] && [ -f "$private_key" ]; then
     info "Loading signing keys into Chalk"
     copy_keys
     chalk setup
-elif [ -n "$setup" ] || [ -n "$token" ]; then
+elif [ -n "$setup" ]; then
     info "Setting up Chalk attestation"
     chalk setup
 fi
