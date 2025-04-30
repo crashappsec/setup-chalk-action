@@ -55,7 +55,7 @@ For example:
 - name: Set up Chalk
   uses: crashappsec/setup-chalk-action@main
   with:
-    version: 0.5.5
+    version: 0.5.6
     connect: true
     profile: myprofile
     load: https://chalkdust.io/debug.c4m
