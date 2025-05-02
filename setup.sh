@@ -105,14 +105,12 @@ if ! is_installed sudo; then
     SUDO=
 fi
 
-PROFILE=https://chalk.crashoverride.run/v0.1/profile
-GITHUB_OPENID_CONNECT=https://chalk.crashoverride.run/v0.1/openid-connect/github
-GITLAB_OPENID_CONNECT=https://chalk.crashoverride.run/v0.1/openid-connect/gitlab
+ENTITLEMENTS_HOST=https://entitlements.crashoverride.run
+CHALKAPI_HOST=
 if [ -n "${__CHALK_TESTING__:-}" ]; then
     warn Beware - chalk is now using test environment which is meant for internal chalk testing only.
-    PROFILE=https://chalk-test.crashoverride.run/v0.1/profile
-    GITHUB_OPENID_CONNECT=https://chalk-test.crashoverride.run/v0.1/openid-connect/github
-    GITLAB_OPENID_CONNECT=https://chalk-test.crashoverride.run/v0.1/openid-connect/gitlab
+    ENTITLEMENTS_HOST=https://entitlements-test.crashoverride.run
+    CHALKAPI_HOST=https://chalk-test.crashoverride.run
 fi
 
 first_owner() {
@@ -147,8 +145,16 @@ enable_debug() {
     debug=true
 }
 
+set_chalkapi_host_from_headers() {
+    # grabbing token from headers to avoid dependency on jq
+    CHALKAPI_HOST=$(header_value "$1" x-chalk-api-host)
+    if [ -z "$CHALKAPI_HOST" ]; then
+        fatal Could not lookup Chalk API host via entitlements service.
+    fi
+}
+
 openid_connect_github() {
-    info Authenticating to CrashOverride via GitHub OpenID Connect
+    info Generating GitHub OpenID Connect JWT
     github_jwt=$(mktemp -t github_jwt.XXXXXX)
     curl \
         --fail \
@@ -163,6 +169,27 @@ openid_connect_github() {
             error Please make sure workflow/job has "'id-token: write'" permission.
             fatal See https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect#adding-permissions-settings
         )
+    if [ -z "$CHALKAPI_HOST" ]; then
+        info Looking up Chalk API host via CrashOverride entitlement API from GitHub OpenID Connect JWT.
+        entitlement_headers=$(mktemp -t co_ent_jwt.XXXXXX)
+        curl \
+            --fail \
+            --show-error \
+            --silent \
+            --location \
+            --request POST \
+            --header 'Content-Type: application/json' \
+            --data-binary @"$github_jwt" \
+            --dump-header "$entitlement_headers" \
+            "$ENTITLEMENTS_HOST/v0.1/routes/oidc/github" \
+            > /dev/null \
+            || (
+                error Could not lookup Chalk API host from entitlements service via GitHub OpenID Connect JWT.
+                fatal Please make sure GitHub integration is configured in your CrashOverride workspace.
+            )
+        set_chalkapi_host_from_headers "$entitlement_headers"
+    fi
+    info Authenticating to CrashOverride via GitHub OpenID Connect
     co_headers=$(mktemp -t co_jwt.XXXXXX)
     curl \
         --fail \
@@ -173,7 +200,7 @@ openid_connect_github() {
         --header 'Content-Type: application/json' \
         --data-binary @"$github_jwt" \
         --dump-header "$co_headers" \
-        $GITHUB_OPENID_CONNECT \
+        "$CHALKAPI_HOST/v0.1/openid-connect/github" \
         > /dev/null \
         || (
             error Could not retrieve Chalk JWT token from GitHub OpenID Connect JWT.
@@ -196,6 +223,26 @@ openid_connect_gitlab() {
 EOF
         fatal See https://docs.gitlab.com/ee/ci/secrets/id_token_authentication.html
     fi
+    if [ -z "$CHALKAPI_HOST" ]; then
+        info Looking up Chalk API host via CrashOverride entitlement API from GitLab OpenID Connect JWT.
+        entitlement_headers=$(mktemp -t co_ent_jwt.XXXXXX)
+        curl \
+            --fail \
+            --show-error \
+            --silent \
+            --location \
+            --request POST \
+            --header 'Content-Type: application/json' \
+            --header "Authorization: bearer $oidc" \
+            --dump-header "$entitlement_headers" \
+            "$ENTITLEMENTS_HOST/v0.1/routes/oidc/gitlab" \
+            > /dev/null \
+            || (
+                error Could not lookup Chalk API host from entitlements service via GitLab OpenID Connect JWT.
+                fatal Please make sure GitLab integration is configured in your CrashOverride workspace.
+            )
+        set_chalkapi_host_from_headers "$entitlement_headers"
+    fi
     info Authenticating to CrashOverride via GitLab OpenID Connect
     co_headers=$(mktemp -t co_jwt.XXXXXX)
     curl \
@@ -207,7 +254,7 @@ EOF
         --header 'Content-Type: application/json' \
         --header "Authorization: bearer $oidc" \
         --dump-header "$co_headers" \
-        $GITLAB_OPENID_CONNECT \
+        "$CHALKAPI_HOST/v0.1/openid-connect/gitlab" \
         > /dev/null \
         || (
             error Could not retrieve Chalk JWT token from GitLab OpenID Connect JWT.
@@ -227,6 +274,30 @@ token_via_openid_connect() {
     fi
 }
 
+chalkapi_host() {
+    if [ -z "$CHALKAPI_HOST" ]; then
+        info Looking up Chalk API host from entitlement service via chalk JWT.
+        entitlement_headers=$(mktemp -t entitlement_headers.XXXXXX)
+        result=$(mktemp -t entitlement_respose.XXXXXX)
+        curl \
+            --fail \
+            --show-error \
+            --silent \
+            --location \
+            --request GET \
+            --header "Authorization: bearer $token" \
+            --dump-header "$entitlement_headers" \
+            "$ENTITLEMENTS_HOST/v0.1/routes/chalkapi" \
+            > "$result" \
+            || (
+                error Could not lookup Chalk API host from entitlements service via GitHub OpenID Connect JWT.
+                fatal "$(cat "$result")"
+            )
+        set_chalkapi_host_from_headers "$entitlement_headers"
+    fi
+    echo "$CHALKAPI_HOST"
+}
+
 load_custom_profile() {
     info Loading custom Chalk profile from CrashOverride
     headers=$(mktemp -t co_headers.XXXXXX)
@@ -239,7 +310,7 @@ load_custom_profile() {
         --request POST \
         --header "Authorization: bearer $token" \
         --dump-header "$headers" \
-        "$PROFILE?chalkVersion=$(chalk_version)&chalkProfileKey=$profile" \
+        "$(chalkapi_host)/v0.1/profile?chalkVersion=$(chalk_version)&chalkProfileKey=$profile" \
         > "$result" \
         || (
             error Could not retrieve custom Chalk profile.
