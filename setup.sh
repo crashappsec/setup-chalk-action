@@ -649,7 +649,7 @@ for arg; do
         --prefix=*)
             p=${arg##*=}
             if [ -n "$p" ]; then
-                prefix=${arg##*=}
+                prefix=$p
                 prefix=$(echo "$prefix" | sed "s#~#$HOME#" | sed 's/bin$//')
                 prefix=$(realpath "$prefix")
             fi

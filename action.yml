@@ -118,8 +118,8 @@ runs:
           --profile='${{ inputs.profile }}' \
           --prefix=${{ job.container.id == '' && '$HOME/.chalk' || '' }} \
           ${{ inputs.connect == 'true' && '--connect' || '' }} \
-          ${{ inputs.public_key != '' && format('--public-key=./chalk.pub') || '' }} \
-          ${{ inputs.private_key != '' && format('--private-key=./chalk.key') || '' }} \
+          ${{ inputs.public_key != '' && '--public-key=./chalk.pub' || '' }} \
+          ${{ inputs.private_key != '' && '--private-key=./chalk.key' || '' }} \
           ${{ runner.debug == '1' && '--debug' || '' }}
 
     # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow
