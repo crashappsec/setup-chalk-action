@@ -55,14 +55,14 @@ runs:
   steps:
     - name: Hide provided JWT token
       if: inputs.token != ''
-      shell: bash
+      shell: sh
       working-directory: ${{ github.action_path }}
       run: |
         echo "::add-mask::${{ inputs.token }}"
 
     - name: Hide provided password
       if: inputs.password != ''
-      shell: bash
+      shell: sh
       working-directory: ${{ github.action_path }}
       run: |
         echo "::add-mask::${{ inputs.password }}"
@@ -74,19 +74,19 @@ runs:
 
     - name: Add Chalk to PATH
       if: runner.os == 'Linux' || runner.os == 'macOS'
-      shell: bash
+      shell: sh
       run: |
         echo "$HOME/.chalk/bin" >> $GITHUB_PATH
 
     - name: Set CHALK_PASSWORD
       if: (runner.os == 'Linux' || runner.os == 'macOS') && inputs.password != ''
-      shell: bash
+      shell: sh
       run: |
         echo "CHALK_PASSWORD=${{ inputs.password }}" >> $GITHUB_ENV
 
     - name: Save Public Key
       if: (runner.os == 'Linux' || runner.os == 'macOS') && inputs.public_key != ''
-      shell: bash
+      shell: sh
       working-directory: ${{ github.action_path }}
       env:
         CHALK_PUBLIC_KEY: "${{ inputs.public_key }}"
@@ -95,7 +95,7 @@ runs:
 
     - name: Save Private Key
       if: (runner.os == 'Linux' || runner.os == 'macOS') && inputs.private_key != ''
-      shell: bash
+      shell: sh
       working-directory: ${{ github.action_path }}
       env:
         CHALK_PRIVATE_KEY: "${{ inputs.private_key }}"
@@ -104,7 +104,7 @@ runs:
 
     - name: Set up chalk
       if: runner.os == 'Linux' || runner.os == 'macOS'
-      shell: bash
+      shell: sh
       run: |
         ${{ github.action_path }}/setup.sh \
           --version='${{ inputs.version }}' \
@@ -129,6 +129,6 @@ runs:
     # and so we export it here to ensure chalk can succeed with its metadata collection
     - name: Export GITHUB_TOKEN
       if: runner.os == 'Linux' || runner.os == 'macOS'
-      shell: bash
+      shell: sh
       run: |
         [ -z "$GITHUB_TOKEN" ] && echo "GITHUB_TOKEN=${{ github.token }}" >> $GITHUB_ENV
