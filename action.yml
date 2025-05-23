@@ -56,14 +56,14 @@ runs:
     - name: Hide provided JWT token
       if: inputs.token != ''
       shell: sh
-      working-directory: ${{ github.action_path }}
+      working-directory: ${{ inputs.action_path }}
       run: |
         echo "::add-mask::${{ inputs.token }}"
 
     - name: Hide provided password
       if: inputs.password != ''
       shell: sh
-      working-directory: ${{ github.action_path }}
+      working-directory: ${{ inputs.action_path }}
       run: |
         echo "::add-mask::${{ inputs.password }}"
 
@@ -87,7 +87,7 @@ runs:
     - name: Save Public Key
       if: (runner.os == 'Linux' || runner.os == 'macOS') && inputs.public_key != ''
       shell: sh
-      working-directory: ${{ github.action_path }}
+      working-directory: ${{ inputs.action_path }}
       env:
         CHALK_PUBLIC_KEY: "${{ inputs.public_key }}"
       run: |
@@ -96,7 +96,7 @@ runs:
     - name: Save Private Key
       if: (runner.os == 'Linux' || runner.os == 'macOS') && inputs.private_key != ''
       shell: sh
-      working-directory: ${{ github.action_path }}
+      working-directory: ${{ inputs.action_path }}
       env:
         CHALK_PRIVATE_KEY: "${{ inputs.private_key }}"
       run: |
@@ -106,7 +106,7 @@ runs:
       if: runner.os == 'Linux' || runner.os == 'macOS'
       shell: sh
       run: |
-        ${{ github.action_path }}/setup.sh \
+        ${{ inputs.action_path }}/setup.sh \
           --version='${{ inputs.version }}' \
           --load='${{ inputs.load }}' \
           --params='${{ inputs.params }}' \
@@ -114,8 +114,8 @@ runs:
           --prefix=$HOME/.chalk \
           --profile='${{ inputs.profile }}' \
           ${{ inputs.connect == 'true' && '--connect' || '' }} \
-          ${{ inputs.public_key != '' && format('--public-key={0}/chalk.pub', github.action_path) || '' }} \
-          ${{ inputs.private_key != '' && format('--private-key={0}/chalk.key', github.action_path) || '' }} \
+          ${{ inputs.public_key != '' && format('--public-key={0}/chalk.pub', inputs.action_path) || '' }} \
+          ${{ inputs.private_key != '' && format('--private-key={0}/chalk.key', inputs.action_path) || '' }} \
           ${{ runner.debug == '1' && '--debug' || '' }}
 
     # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow
