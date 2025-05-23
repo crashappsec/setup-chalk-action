@@ -108,8 +108,9 @@ runs:
     - name: Set up chalk
       if: runner.os == 'Linux' || runner.os == 'macOS'
       shell: sh
+      working-directory: ${{ github.action_path }}
       run: |
-        ${{ github.action_path }}/setup.sh \
+        ./setup.sh \
           --version='${{ inputs.version }}' \
           --load='${{ inputs.load }}' \
           --params='${{ inputs.params }}' \
@@ -117,8 +118,8 @@ runs:
           --prefix=$HOME/.chalk \
           --profile='${{ inputs.profile }}' \
           ${{ inputs.connect == 'true' && '--connect' || '' }} \
-          ${{ inputs.public_key != '' && format('--public-key={0}/chalk.pub', github.action_path) || '' }} \
-          ${{ inputs.private_key != '' && format('--private-key={0}/chalk.key', github.action_path) || '' }} \
+          ${{ inputs.public_key != '' && format('--public-key=./chalk.pub') || '' }} \
+          ${{ inputs.private_key != '' && format('--private-key=./chalk.key') || '' }} \
           ${{ runner.debug == '1' && '--debug' || '' }}
 
     # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow
