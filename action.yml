@@ -71,6 +71,9 @@ runs:
     - name: Install cosign
       if: runner.os == 'Linux' || runner.os == 'macOS'
       uses: sigstore/cosign-installer@main
+      # most likely bash is missing
+      # https://github.com/sigstore/cosign-installer/issues/190
+      continue-on-error: true
 
     - name: Add Chalk to PATH
       if: runner.os == 'Linux' || runner.os == 'macOS'
