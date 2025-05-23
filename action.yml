@@ -115,8 +115,8 @@ runs:
           --load='${{ inputs.load }}' \
           --params='${{ inputs.params }}' \
           --token='${{ inputs.token }}' \
-          --prefix=$HOME/.chalk \
           --profile='${{ inputs.profile }}' \
+          --prefix=${{ job.container.id == '' && '$HOME/.chalk' || '' }} \
           ${{ inputs.connect == 'true' && '--connect' || '' }} \
           ${{ inputs.public_key != '' && format('--public-key=./chalk.pub') || '' }} \
           ${{ inputs.private_key != '' && format('--private-key=./chalk.key') || '' }} \

@@ -647,9 +647,12 @@ for arg; do
             params=${arg##*=}
             ;;
         --prefix=*)
-            prefix=${arg##*=}
-            prefix=$(echo "$prefix" | sed "s#~#$HOME#" | sed 's/bin$//')
-            prefix=$(realpath "$prefix")
+            p=${arg##*=}
+            if [ -n "$p" ]; then
+                prefix=${arg##*=}
+                prefix=$(echo "$prefix" | sed "s#~#$HOME#" | sed 's/bin$//')
+                prefix=$(realpath "$prefix")
+            fi
             ;;
         --chalk-path=*)
             chalk_path=${arg##*=}
@@ -702,7 +705,7 @@ fi
 chalk_path=$(get_chalk_path)
 chalk_tmp=
 
-if am_owner "$prefix"; then
+if am_owner "$prefix" || [ "$(id -u)" = "0" ]; then
     SUDO=
 else
     if [ -z "$SUDO" ]; then
