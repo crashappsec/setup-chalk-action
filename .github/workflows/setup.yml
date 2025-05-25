@@ -10,15 +10,12 @@ env:
   COSIGN_PASSWORD: 6EHvWD1BUk0yWdvm-GGNxA==
 
 jobs:
-  verify:
+  ubuntu:
     runs-on: ubuntu-latest
 
-    concurrency:
-      # only allow one job per PR running
-      # older pending jobs will be cancelled not to waste CI minutes
-      # cannot use github.job here https://github.com/community/community/discussions/13496
-      group: ${{ github.workflow }}-setup-${{ github.ref }}
-      cancel-in-progress: true
+    outputs:
+      PUBLIC_KEY: ${{ steps.key.outputs.PUBLIC_KEY }}
+      PRIVATE_KEY: ${{ steps.key.outputs.PRIVATE_KEY }}
 
     steps:
       - name: Checkout
@@ -43,16 +40,62 @@ jobs:
             echo EOF
           } >> "$GITHUB_ENV"
 
+      - name: Export key
+        id: key
+        run: |
+          printf "PUBLIC_KEY<<EOF\n%s\nEOF\n" "${{ env.PUBLIC_KEY }}" >> "$GITHUB_OUTPUT"
+          printf "PRIVATE_KEY<<EOF\n%s\nEOF\n" "${{ env.PRIVATE_KEY }}" >> "$GITHUB_OUTPUT"
+
       - name: Setup Chalk
         uses: ./
         with:
           password: ${{ env.COSIGN_PASSWORD }}
           public_key: ${{ env.PUBLIC_KEY }}
           private_key: ${{ env.PRIVATE_KEY }}
+          load: |
+            .github/config.c4m
 
       - name: Verify Setup
         run: |
           echo 'log_level: "trace"' | sudo tee /etc/chalk.conf
+          set -x
+          which chalk
+          which docker
+          strings $(which chalk) | tail -n 18 | head -n1 | jq
+          strings $(which docker) | tail -n 18 | head -n1 | jq
+          chalk version
+          docker version
+
+  container:
+    runs-on: ubuntu-latest
+
+    container:
+      image: docker
+
+    # docker containeris alpine-based hence cannot install cosign here directly
+    # as it requires bash
+    needs: [ubuntu] # for cosign
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Deps
+        run: |
+          apk add --no-cache curl jq
+
+      - name: Setup Chalk
+        uses: ./
+        with:
+          password: ${{ env.COSIGN_PASSWORD }}
+          public_key: ${{ needs.ubuntu.outputs.PUBLIC_KEY }}
+          private_key: ${{ needs.ubuntu.outputs.PRIVATE_KEY }}
+          load: |
+            .github/config.c4m
+
+      - name: Verify Setup
+        run: |
+          echo 'log_level: "trace"' | tee /etc/chalk.conf
           set -x
           which chalk
           which docker
