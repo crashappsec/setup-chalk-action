@@ -54,7 +54,7 @@ is_installed() {
 }
 
 # version of chalk to download
-version=${CHALK_VERSION:-latest}
+version=${CHALK_VERSION:-}
 # which config to load after install
 load=${CHALK_LOAD:-}
 # json params to load
@@ -296,6 +296,26 @@ chalkapi_host() {
         set_chalkapi_host_from_headers "$entitlement_headers"
     fi
     echo "$CHALKAPI_HOST"
+}
+
+get_profile_chalk_version() {
+    info Looking up which chalk version to install via Chalk profile from CrashOverride
+    result=$(mktemp -t chalk_version.XXXXXX)
+    curl \
+        --fail \
+        --show-error \
+        --silent \
+        --location \
+        --request GET \
+        --header "Authorization: bearer $token" \
+        "$(chalkapi_host)/v0.1/profile/version?chalkProfileKey=$profile" \
+        | tee "$result" \
+        || (
+            error Could not lookup chalk version to install via Chalk profile.
+            fatal "$(cat "$result")"
+        )
+    version=$(cat "$result")
+    info Chalk profile is configured to use version: "$version"
 }
 
 load_custom_profile() {
@@ -571,6 +591,9 @@ Args:
 -h / --help         Show this message
 --version=*         Chalk version/commit to download.
                     Default is '${version}'.
+                    If empty and --connect is used,
+                    version is lookedup from CrashOverride profile.
+                    Otherwise default is 'latest'.
 --load=*            Comma/newline delimited paths/URLs
                     of Chalk components to load.
 --params=*          JSON of component params to load.
@@ -724,6 +747,10 @@ fi
 if ! [ -f "$chalk_path" ] || [ -n "$overwrite" ]; then
     if [ -f "$chalk_path" ]; then
         info "$chalk_path" is already installed. overwriting
+    fi
+
+    if [ -n "$token" ] && [ -z "$version" ]; then
+        version=$(get_profile_chalk_version)
     fi
 
     if [ -z "$version" ] || [ "$version" = "latest" ]; then
