@@ -8,7 +8,7 @@ inputs:
       By default latest version is installed.
       See https://crashoverride.com/releases for all available versions.
     required: false
-    default: latest
+    default: ""
   load:
     description: |
       Chalk config(s) to load - comma or new-line delimited.
