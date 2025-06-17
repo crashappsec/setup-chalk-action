@@ -62,7 +62,7 @@ cleanup() {
     rm "$tmp_files" || true
 }
 
-trap cleanup EXIT
+trap cleanup EXIT INT TERM
 
 is_installed() {
     name=$1
