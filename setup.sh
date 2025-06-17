@@ -48,6 +48,22 @@ fatal() {
     exit 1
 }
 
+tmp_files=$(command mktemp)
+
+mktemp() {
+    # shellcheck disable=2068
+    command mktemp $@ | tee -a "$tmp_files"
+}
+
+cleanup() {
+    while IFS= read -r f; do
+        rm "$f" || true
+    done < "$tmp_files"
+    rm "$tmp_files" || true
+}
+
+trap cleanup EXIT
+
 is_installed() {
     name=$1
     which "$name" > /dev/null 2>&1
