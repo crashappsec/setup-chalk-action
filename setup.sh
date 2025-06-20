@@ -356,6 +356,7 @@ load_custom_profile() {
     component_url=$(header_value "$headers" x-chalk-component-url)
     parameters_url=$(header_value "$headers" x-chalk-component-parameters-url)
     run_setup=$(header_value "$headers" x-chalk-setup)
+    build_observables=$(header_value "$headers" x-chalk-build-observables)
     component=$(mktemp -t co_component_XXXXXX).c4m
     parameters=$(mktemp -t co_params_XXXXXX).json
     curl \
@@ -385,6 +386,9 @@ load_custom_profile() {
     if [ "$run_setup" = "true" ]; then
         info "Setting up CrashOverride Chalk attestation"
         chalk setup
+    fi
+    if [ "$build_observables" = "true" ] && [ -n "${GITHUB_OUTPUT:-}" ]; then
+        echo "setup_build_observables=true" >> "$GITHUB_OUTPUT"
     fi
 }
 
