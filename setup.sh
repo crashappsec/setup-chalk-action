@@ -69,6 +69,9 @@ is_installed() {
     which "$name" > /dev/null 2>&1
 }
 
+os=${os:-$(uname -s)}
+arch=${arch:-$(uname -m)}
+
 # version of chalk to download
 version=${CHALK_VERSION:-}
 # which config to load after install
@@ -346,7 +349,7 @@ load_custom_profile() {
         --request POST \
         --header "Authorization: bearer $token" \
         --dump-header "$headers" \
-        "$(chalkapi_host)/v0.1/profile?chalkVersion=$(chalk_version)&chalkProfileKey=$profile" \
+        "$(chalkapi_host)/v0.1/profile?chalkVersion=$(chalk_version)&chalkProfileKey=$profile&os=$os&architecture=$arch" \
         > "$result" \
         || (
             error Could not retrieve custom Chalk profile.
@@ -425,8 +428,6 @@ chalk_folder() {
 
 # get the chalk file name for the version/os/architecture
 chalk_version_name() {
-    os=${os:-$(uname -s)}
-    arch=${arch:-$(uname -m)}
     echo "chalk-$version-$os-$arch"
 }
 
