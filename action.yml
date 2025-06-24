@@ -132,7 +132,9 @@ runs:
 
     - name: Set up build observables
       if: runner.os == 'Linux' && steps.chalk.outputs.setup_build_observables == 'true'
-      uses: crashappsec/setup-chalk-build-observables@main
+      uses: crashappsec/setup-chalk-build-observables@install
+      with:
+        curiosity_archive_url: ${{ steps.chalk.outputs.curiosity_archive_url }}
 
     # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow
     # in some cases chalk needs to auth to GitHub API and it requires
