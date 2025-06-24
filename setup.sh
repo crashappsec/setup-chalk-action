@@ -394,6 +394,7 @@ load_custom_profile() {
     if [ "$build_observables" = "true" ] \
         && [ -n "${GITHUB_OUTPUT:-}" ] \
         && [ -n "$curiosity_archive" ]; then
+        info "Enabling build observables for this workflow"
         echo "setup_build_observables=true" >> "$GITHUB_OUTPUT"
         echo "curiosity_archive_url=$curiosity_archive" >> "$GITHUB_OUTPUT"
     fi
