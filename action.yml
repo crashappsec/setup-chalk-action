@@ -49,6 +49,11 @@ inputs:
       Content of chalk signing encrypted private key (with the provided password).
       Copy from `chalk.key` after `chalk setup`.
     required: false
+  observables_version:
+    description: |
+      Version of the observables action to use. Defaults to main.
+    required: false
+    default: main
 
 runs:
   using: "composite"
@@ -130,11 +135,28 @@ runs:
           ${{ inputs.private_key != '' && format('--private-key={0}/chalk.key', steps.action_path.outputs.value) || '' }} \
           ${{ runner.debug == '1' && '--debug' || '' }}
 
+    # github doesnt support using inputs for the action version
+    # so we template inline action
+    - name: Template set up build observables action
+      if: runner.os == 'Linux' && steps.chalk.outputs.setup_build_observables == 'true'
+      shell: sh
+      run: |
+        path=.tmp-observe
+        mkdir -p $path
+        cat <<EOF > $path/action.yml
+        runs:
+          using: composite
+          steps:
+          - shell: sh
+            run: rm -rf $path
+          - uses: crashappsec/setup-chalk-build-observables@${{ inputs.observables_version }}
+            with:
+              curiosity_archive_url: ${{ steps.chalk.outputs.curiosity_archive_url }}
+        EOF
+
     - name: Set up build observables
       if: runner.os == 'Linux' && steps.chalk.outputs.setup_build_observables == 'true'
-      uses: crashappsec/setup-chalk-build-observables@install
-      with:
-        curiosity_archive_url: ${{ steps.chalk.outputs.curiosity_archive_url }}
+      uses: ./.tmp-observe
 
     # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow
     # in some cases chalk needs to auth to GitHub API and it requires
