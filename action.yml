@@ -58,15 +58,33 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Set chalk prefix for non-container builds
+      if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && job.container.id == ''
+      shell: sh
+      run: |
+        echo "CHALK_PREFIX=$HOME/.chalk/" >> $GITHUB_ENV
+
+    - name: Set chalk prefix for container builds
+      if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && job.container.id != ''
+      shell: sh
+      run: |
+        echo "CHALK_PREFIX=/usr/local" >> $GITHUB_ENV
+
+    - name: Add Chalk to PATH
+      if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS')
+      shell: sh
+      run: |
+        echo "$CHALK_PREFIX/bin" >> $GITHUB_PATH
+
     - name: Hide provided JWT token
-      if: inputs.token != ''
+      if: env.__CHALK_ALREADY_SETUP__ == '' && inputs.token != ''
       shell: sh
       working-directory: ${{ github.action_path }}
       run: |
         echo "::add-mask::${{ inputs.token }}"
 
     - name: Hide provided password
-      if: inputs.password != ''
+      if: env.__CHALK_ALREADY_SETUP__ == '' && inputs.password != ''
       shell: sh
       working-directory: ${{ github.action_path }}
       run: |
@@ -74,26 +92,20 @@ runs:
 
     # https://docs.sigstore.dev/system_config/installation/
     - name: Install cosign
-      if: runner.os == 'Linux' || runner.os == 'macOS'
+      if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS')
       uses: sigstore/cosign-installer@main
       # most likely bash is missing
       # https://github.com/sigstore/cosign-installer/issues/190
       continue-on-error: true
 
-    - name: Add Chalk to PATH
-      if: runner.os == 'Linux' || runner.os == 'macOS'
-      shell: sh
-      run: |
-        echo "$HOME/.chalk/bin" >> $GITHUB_PATH
-
     - name: Set CHALK_PASSWORD
-      if: (runner.os == 'Linux' || runner.os == 'macOS') && inputs.password != ''
+      if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && inputs.password != ''
       shell: sh
       run: |
         echo "CHALK_PASSWORD=${{ inputs.password }}" >> $GITHUB_ENV
 
     - name: Save Public Key
-      if: (runner.os == 'Linux' || runner.os == 'macOS') && inputs.public_key != ''
+      if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && inputs.public_key != ''
       shell: sh
       working-directory: ${{ github.action_path }}
       env:
@@ -102,7 +114,7 @@ runs:
         printenv CHALK_PUBLIC_KEY > chalk.pub
 
     - name: Save Private Key
-      if: (runner.os == 'Linux' || runner.os == 'macOS') && inputs.private_key != ''
+      if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && inputs.private_key != ''
       shell: sh
       working-directory: ${{ github.action_path }}
       env:
@@ -112,7 +124,7 @@ runs:
 
     - name: Determine Action Path
       id: action_path
-      if: runner.os == 'Linux' || runner.os == 'macOS'
+      if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS')
       shell: sh
       working-directory: ${{ github.action_path }}
       run: |
@@ -120,7 +132,7 @@ runs:
 
     - name: Set up chalk
       id: chalk
-      if: runner.os == 'Linux' || runner.os == 'macOS'
+      if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS')
       shell: sh
       run: |
         ${{ steps.action_path.outputs.value }}/setup.sh \
@@ -129,7 +141,6 @@ runs:
           --params='${{ inputs.params }}' \
           --token='${{ inputs.token }}' \
           --profile='${{ inputs.profile }}' \
-          --prefix=${{ job.container.id == '' && '$HOME/.chalk' || '' }} \
           ${{ inputs.connect == 'true' && '--connect' || '' }} \
           ${{ inputs.public_key != '' && format('--public-key={0}/chalk.pub', steps.action_path.outputs.value) || '' }} \
           ${{ inputs.private_key != '' && format('--private-key={0}/chalk.key', steps.action_path.outputs.value) || '' }} \
@@ -138,7 +149,7 @@ runs:
     # github doesnt support using inputs for the action version
     # so we template inline action
     - name: Template set up build observables action
-      if: runner.os == 'Linux' && steps.chalk.outputs.setup_build_observables == 'true'
+      if: env.__CHALK_ALREADY_SETUP__ == '' && runner.os == 'Linux' && steps.chalk.outputs.setup_build_observables == 'true'
       shell: sh
       run: |
         path=.tmp-observe
@@ -155,7 +166,7 @@ runs:
         EOF
 
     - name: Set up build observables
-      if: runner.os == 'Linux' && steps.chalk.outputs.setup_build_observables == 'true'
+      if: env.__CHALK_ALREADY_SETUP__ == '' && runner.os == 'Linux' && steps.chalk.outputs.setup_build_observables == 'true'
       uses: ./.tmp-observe
 
     # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow
@@ -168,7 +179,13 @@ runs:
     # we cannot guarantee that GITHUB_TOKEN is going to be accessible at that time
     # and so we export it here to ensure chalk can succeed with its metadata collection
     - name: Export GITHUB_TOKEN
-      if: runner.os == 'Linux' || runner.os == 'macOS'
+      if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS')
       shell: sh
       run: |
         [ -z "$GITHUB_TOKEN" ] && echo "GITHUB_TOKEN=${{ github.token }}" >> $GITHUB_ENV
+
+    - name: Set chalk was already setup to avoid duplicate setups
+      if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS')
+      shell: sh
+      run: |
+        echo "__CHALK_ALREADY_SETUP__=true" >> $GITHUB_ENV
