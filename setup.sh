@@ -173,6 +173,11 @@ set_chalkapi_host_from_headers() {
 }
 
 openid_connect_github() {
+    if [ -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
+        error Cannot generate GitHub OpenId Connect JWT Token.
+        error Workflow/job "'id-token: write'" permission is missing.
+        fatal See https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect#adding-permissions-settings
+    fi
     info Generating GitHub OpenID Connect JWT
     github_jwt=$(mktemp -t github_jwt.XXXXXX)
     curl \
@@ -284,7 +289,7 @@ EOF
 }
 
 token_via_openid_connect() {
-    if [ -n "${CI:-}" ] && [ -n "${GITHUB_SHA:-}" ] && [ -n "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
+    if [ -n "${CI:-}" ] && [ -n "${GITHUB_SHA:-}" ]; then
         openid_connect_github
     elif [ -n "${CI:-}" ] && [ -n "${GITLAB_CI:-}" ]; then
         openid_connect_gitlab
