@@ -152,7 +152,12 @@ first_owner() {
     do
         path=$(dirname "$path")
     done
-    stat -c %u "$path"
+    if [ "$os" = "Darwin" ]; then
+        # mac uses -f for format instead of -c but on linux -f shows filesystem :shrug:
+        stat -f %u "$path"
+    else
+        stat -c %u "$path"
+    fi
 }
 
 am_owner() {
