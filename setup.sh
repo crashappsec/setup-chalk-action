@@ -52,7 +52,7 @@ tmp_files=$(command mktemp)
 
 mktemp() {
     # shellcheck disable=2068
-    command mktemp $@ | tee -a "$tmp_files"
+    command mktemp -p "${TMPDIR:-${TMP:-/tmp}}" $@ | tee -a "$tmp_files"
 }
 
 cleanup() {
@@ -192,7 +192,7 @@ openid_connect_github() {
         fatal See https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect#adding-permissions-settings
     fi
     info Generating GitHub OpenID Connect JWT
-    github_jwt=$(mktemp -t github_jwt.XXXXXX)
+    github_jwt=$(mktemp github_jwt.XXXXXX)
     curl \
         --fail \
         --show-error \
@@ -208,7 +208,7 @@ openid_connect_github() {
         )
     if [ -z "$CHALKAPI_HOST" ]; then
         info Looking up Chalk API host via CrashOverride entitlement API from GitHub OpenID Connect JWT.
-        entitlement_headers=$(mktemp -t co_ent_jwt.XXXXXX)
+        entitlement_headers=$(mktemp co_ent_jwt.XXXXXX)
         curl \
             --fail \
             --show-error \
@@ -227,7 +227,7 @@ openid_connect_github() {
         set_chalkapi_host_from_headers "$entitlement_headers"
     fi
     info Authenticating to CrashOverride via GitHub OpenID Connect
-    co_headers=$(mktemp -t co_jwt.XXXXXX)
+    co_headers=$(mktemp co_jwt.XXXXXX)
     curl \
         --fail \
         --show-error \
@@ -262,7 +262,7 @@ EOF
     fi
     if [ -z "$CHALKAPI_HOST" ]; then
         info Looking up Chalk API host via CrashOverride entitlement API from GitLab OpenID Connect JWT.
-        entitlement_headers=$(mktemp -t co_ent_jwt.XXXXXX)
+        entitlement_headers=$(mktemp co_ent_jwt.XXXXXX)
         curl \
             --fail \
             --show-error \
@@ -281,7 +281,7 @@ EOF
         set_chalkapi_host_from_headers "$entitlement_headers"
     fi
     info Authenticating to CrashOverride via GitLab OpenID Connect
-    co_headers=$(mktemp -t co_jwt.XXXXXX)
+    co_headers=$(mktemp co_jwt.XXXXXX)
     curl \
         --fail \
         --show-error \
@@ -314,8 +314,8 @@ token_via_openid_connect() {
 chalkapi_host() {
     if [ -z "$CHALKAPI_HOST" ]; then
         info Looking up Chalk API host from entitlement service via chalk JWT.
-        entitlement_headers=$(mktemp -t entitlement_headers.XXXXXX)
-        result=$(mktemp -t entitlement_respose.XXXXXX)
+        entitlement_headers=$(mktemp entitlement_headers.XXXXXX)
+        result=$(mktemp entitlement_respose.XXXXXX)
         curl \
             --fail \
             --show-error \
@@ -337,7 +337,7 @@ chalkapi_host() {
 
 get_profile_chalk_version() {
     info Looking up which chalk version to install via Chalk profile from CrashOverride
-    result=$(mktemp -t chalk_version.XXXXXX)
+    result=$(mktemp chalk_version.XXXXXX)
     curl \
         --fail \
         --show-error \
@@ -357,8 +357,8 @@ get_profile_chalk_version() {
 
 load_custom_profile() {
     info Loading custom Chalk profile from CrashOverride
-    headers=$(mktemp -t co_headers.XXXXXX)
-    result=$(mktemp -t co_respose.XXXXXX)
+    headers=$(mktemp co_headers.XXXXXX)
+    result=$(mktemp co_respose.XXXXXX)
     curl \
         --fail \
         --show-error \
@@ -379,8 +379,8 @@ load_custom_profile() {
     run_setup=$(header_value "$headers" x-chalk-setup)
     build_observables=$(header_value "$headers" x-chalk-build-observables)
     curiosity_archive=$(header_value "$headers" x-chalk-curiosity-archive)
-    component=$(mktemp -t co_component_XXXXXX).c4m
-    parameters=$(mktemp -t co_params_XXXXXX).json
+    component=$(mktemp co_component_XXXXXX).c4m
+    parameters=$(mktemp co_params_XXXXXX).json
     curl \
         --fail \
         --show-error \
@@ -550,7 +550,7 @@ load_config() {
 add_lines_to_chalk() {
     name=$1
     shift
-    config=$(mktemp -t "chalk_${name}_XXXXXX").c4m
+    config=$(mktemp "chalk_${name}_XXXXXX").c4m
     touch "$config"
     for i; do
         echo "$i" >> "$config"
@@ -606,7 +606,7 @@ wrap_cmd() {
     # create temporary Chalk copy so that we can adjust its configuration
     # to be able to find the moved binary in the chalkless location
     info Wrapping "$chalked_path" with Chalk
-    tmp=$(mktemp -t chalk.XXXXXX)
+    tmp=$(mktemp chalk.XXXXXX)
     $SUDO cp "$chalk_path" "$tmp"
     chalk_path=$tmp add_cmd_exe_to_config "$cmd" "$chalkless_path"
     $SUDO rm "$chalked_path" 2> /dev/null || true
