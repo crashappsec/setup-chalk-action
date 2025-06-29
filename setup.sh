@@ -124,6 +124,19 @@ if ! is_installed sudo; then
     SUDO=
 fi
 
+# timeout is missing by default on mac
+if is_installed "timeout"; then
+    timeout() {
+        # shellcheck disable=2068
+        command timeout -s KILL "${timeout}s" $@
+    }
+else
+    timeout() {
+        # shellcheck disable=2068
+        $@
+    }
+fi
+
 ENTITLEMENTS_HOST=https://entitlements.crashoverride.run
 CHALKAPI_HOST=
 if [ -n "${__CHALK_TESTING__:-}" ]; then
@@ -408,7 +421,7 @@ load_custom_profile() {
 # wrapper for calling chalk within the script
 chalk() {
     $SUDO chmod +xr "$chalk_path"
-    timeout -s KILL "${timeout}s" $SUDO "$chalk_path" --log-level="$log_level" --skip-summary-report --skip-command-report "$@"
+    timeout $SUDO "$chalk_path" --log-level="$log_level" --skip-summary-report --skip-command-report "$@"
 }
 
 chalk_version() {
