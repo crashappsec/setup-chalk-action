@@ -52,7 +52,7 @@ tmp_files=$(command mktemp)
 
 mktemp() {
     # shellcheck disable=2068
-    command mktemp $@ | tee -a "$tmp_files"
+    command mktemp -p "${TMPDIR:-${TMP:-/tmp}}" $@ | tee -a "$tmp_files"
 }
 
 cleanup() {
@@ -68,6 +68,9 @@ is_installed() {
     name=$1
     which "$name" > /dev/null 2>&1
 }
+
+os=${os:-$(uname -s)}
+arch=${arch:-$(uname -m)}
 
 # version of chalk to download
 version=${CHALK_VERSION:-}
@@ -121,6 +124,19 @@ if ! is_installed sudo; then
     SUDO=
 fi
 
+# timeout is missing by default on mac
+if is_installed "timeout"; then
+    timeout() {
+        # shellcheck disable=2068
+        command timeout -s KILL "${timeout}s" $@
+    }
+else
+    timeout() {
+        # shellcheck disable=2068
+        $@
+    }
+fi
+
 ENTITLEMENTS_HOST=https://entitlements.crashoverride.run
 CHALKAPI_HOST=
 if [ -n "${__CHALK_TESTING__:-}" ]; then
@@ -136,7 +152,12 @@ first_owner() {
     do
         path=$(dirname "$path")
     done
-    stat -c %u "$path"
+    if [ "$os" = "Darwin" ]; then
+        # mac uses -f for format instead of -c but on linux -f shows filesystem :shrug:
+        stat -f %u "$path"
+    else
+        stat -c %u "$path"
+    fi
 }
 
 am_owner() {
@@ -170,8 +191,13 @@ set_chalkapi_host_from_headers() {
 }
 
 openid_connect_github() {
+    if [ -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
+        error Cannot generate GitHub OpenId Connect JWT Token.
+        error Workflow/job "'id-token: write'" permission is missing.
+        fatal See https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect#adding-permissions-settings
+    fi
     info Generating GitHub OpenID Connect JWT
-    github_jwt=$(mktemp -t github_jwt.XXXXXX)
+    github_jwt=$(mktemp github_jwt.XXXXXX)
     curl \
         --fail \
         --show-error \
@@ -187,7 +213,7 @@ openid_connect_github() {
         )
     if [ -z "$CHALKAPI_HOST" ]; then
         info Looking up Chalk API host via CrashOverride entitlement API from GitHub OpenID Connect JWT.
-        entitlement_headers=$(mktemp -t co_ent_jwt.XXXXXX)
+        entitlement_headers=$(mktemp co_ent_jwt.XXXXXX)
         curl \
             --fail \
             --show-error \
@@ -206,7 +232,7 @@ openid_connect_github() {
         set_chalkapi_host_from_headers "$entitlement_headers"
     fi
     info Authenticating to CrashOverride via GitHub OpenID Connect
-    co_headers=$(mktemp -t co_jwt.XXXXXX)
+    co_headers=$(mktemp co_jwt.XXXXXX)
     curl \
         --fail \
         --show-error \
@@ -241,7 +267,7 @@ EOF
     fi
     if [ -z "$CHALKAPI_HOST" ]; then
         info Looking up Chalk API host via CrashOverride entitlement API from GitLab OpenID Connect JWT.
-        entitlement_headers=$(mktemp -t co_ent_jwt.XXXXXX)
+        entitlement_headers=$(mktemp co_ent_jwt.XXXXXX)
         curl \
             --fail \
             --show-error \
@@ -260,7 +286,7 @@ EOF
         set_chalkapi_host_from_headers "$entitlement_headers"
     fi
     info Authenticating to CrashOverride via GitLab OpenID Connect
-    co_headers=$(mktemp -t co_jwt.XXXXXX)
+    co_headers=$(mktemp co_jwt.XXXXXX)
     curl \
         --fail \
         --show-error \
@@ -281,7 +307,7 @@ EOF
 }
 
 token_via_openid_connect() {
-    if [ -n "${CI:-}" ] && [ -n "${GITHUB_SHA:-}" ] && [ -n "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
+    if [ -n "${CI:-}" ] && [ -n "${GITHUB_SHA:-}" ]; then
         openid_connect_github
     elif [ -n "${CI:-}" ] && [ -n "${GITLAB_CI:-}" ]; then
         openid_connect_gitlab
@@ -293,8 +319,8 @@ token_via_openid_connect() {
 chalkapi_host() {
     if [ -z "$CHALKAPI_HOST" ]; then
         info Looking up Chalk API host from entitlement service via chalk JWT.
-        entitlement_headers=$(mktemp -t entitlement_headers.XXXXXX)
-        result=$(mktemp -t entitlement_respose.XXXXXX)
+        entitlement_headers=$(mktemp entitlement_headers.XXXXXX)
+        result=$(mktemp entitlement_respose.XXXXXX)
         curl \
             --fail \
             --show-error \
@@ -316,7 +342,7 @@ chalkapi_host() {
 
 get_profile_chalk_version() {
     info Looking up which chalk version to install via Chalk profile from CrashOverride
-    result=$(mktemp -t chalk_version.XXXXXX)
+    result=$(mktemp chalk_version.XXXXXX)
     curl \
         --fail \
         --show-error \
@@ -336,8 +362,8 @@ get_profile_chalk_version() {
 
 load_custom_profile() {
     info Loading custom Chalk profile from CrashOverride
-    headers=$(mktemp -t co_headers.XXXXXX)
-    result=$(mktemp -t co_respose.XXXXXX)
+    headers=$(mktemp co_headers.XXXXXX)
+    result=$(mktemp co_respose.XXXXXX)
     curl \
         --fail \
         --show-error \
@@ -346,7 +372,7 @@ load_custom_profile() {
         --request POST \
         --header "Authorization: bearer $token" \
         --dump-header "$headers" \
-        "$(chalkapi_host)/v0.1/profile?chalkVersion=$(chalk_version)&chalkProfileKey=$profile" \
+        "$(chalkapi_host)/v0.1/profile?chalkVersion=$(chalk_version)&chalkProfileKey=$profile&os=$os&architecture=$arch" \
         > "$result" \
         || (
             error Could not retrieve custom Chalk profile.
@@ -356,8 +382,10 @@ load_custom_profile() {
     component_url=$(header_value "$headers" x-chalk-component-url)
     parameters_url=$(header_value "$headers" x-chalk-component-parameters-url)
     run_setup=$(header_value "$headers" x-chalk-setup)
-    component=$(mktemp -t co_component_XXXXXX).c4m
-    parameters=$(mktemp -t co_params_XXXXXX).json
+    build_observables=$(header_value "$headers" x-chalk-build-observables)
+    curiosity_archive=$(header_value "$headers" x-chalk-curiosity-archive)
+    component=$(mktemp co_component_XXXXXX).c4m
+    parameters=$(mktemp co_params_XXXXXX).json
     curl \
         --fail \
         --show-error \
@@ -386,12 +414,19 @@ load_custom_profile() {
         info "Setting up CrashOverride Chalk attestation"
         chalk setup
     fi
+    if [ "$build_observables" = "true" ] \
+        && [ -n "${GITHUB_OUTPUT:-}" ] \
+        && [ -n "$curiosity_archive" ]; then
+        info "Enabling build observables for this workflow"
+        echo "setup_build_observables=true" >> "$GITHUB_OUTPUT"
+        echo "curiosity_archive_url=$curiosity_archive" >> "$GITHUB_OUTPUT"
+    fi
 }
 
 # wrapper for calling chalk within the script
 chalk() {
     $SUDO chmod +xr "$chalk_path"
-    timeout -s KILL "${timeout}s" $SUDO "$chalk_path" --log-level="$log_level" --skip-summary-report --skip-command-report "$@"
+    timeout $SUDO "$chalk_path" --log-level="$log_level" --skip-summary-report --skip-command-report "$@"
 }
 
 chalk_version() {
@@ -417,8 +452,6 @@ chalk_folder() {
 
 # get the chalk file name for the version/os/architecture
 chalk_version_name() {
-    os=${os:-$(uname -s)}
-    arch=${arch:-$(uname -m)}
     echo "chalk-$version-$os-$arch"
 }
 
@@ -522,7 +555,7 @@ load_config() {
 add_lines_to_chalk() {
     name=$1
     shift
-    config=$(mktemp -t "chalk_${name}_XXXXXX").c4m
+    config=$(mktemp "chalk_${name}_XXXXXX").c4m
     touch "$config"
     for i; do
         echo "$i" >> "$config"
@@ -578,7 +611,7 @@ wrap_cmd() {
     # create temporary Chalk copy so that we can adjust its configuration
     # to be able to find the moved binary in the chalkless location
     info Wrapping "$chalked_path" with Chalk
-    tmp=$(mktemp -t chalk.XXXXXX)
+    tmp=$(mktemp chalk.XXXXXX)
     $SUDO cp "$chalk_path" "$tmp"
     chalk_path=$tmp add_cmd_exe_to_config "$cmd" "$chalkless_path"
     $SUDO rm "$chalked_path" 2> /dev/null || true
