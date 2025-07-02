@@ -168,6 +168,7 @@ runs:
     - name: Set up build observables
       if: env.__CHALK_ALREADY_SETUP__ == '' && runner.os == 'Linux' && steps.chalk.outputs.setup_build_observables == 'true'
       uses: ./.tmp-observe
+      continue-on-error: true
 
     # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow
     # in some cases chalk needs to auth to GitHub API and it requires
