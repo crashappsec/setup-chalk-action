@@ -183,7 +183,7 @@ runs:
       if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS')
       shell: sh
       run: |
-        [ -z "$GITHUB_TOKEN" ] && echo "GITHUB_TOKEN=${{ github.token }}" >> $GITHUB_ENV
+        [ -z "$GITHUB_TOKEN" ] && echo "GITHUB_TOKEN=${{ github.token }}" >> $GITHUB_ENV || true
 
     - name: Set chalk was already setup to avoid duplicate setups
       if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS')
