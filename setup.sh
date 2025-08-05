@@ -72,8 +72,15 @@ is_installed() {
 os=${os:-$(uname -s)}
 arch=${arch:-$(uname -m)}
 
+URL_PREFIX=https://dl.crashoverride.run
+SHA256=sha256sum
+SUDO=sudo
+TMP=/tmp
+
 # version of chalk to download
 version=${CHALK_VERSION:-}
+# url to fetch latest chalk version
+latest_version_url=$URL_PREFIX/chalk/current-version.txt
 # which config to load after install
 load=${CHALK_LOAD:-}
 # json params to load
@@ -109,11 +116,6 @@ public_key=${CHALK_PUBLIC_KEY:-}
 private_key=${CHALK_PRIVATE_KEY:-}
 # run chalk setup
 setup=${CHALK_SETUP:-}
-
-URL_PREFIX=https://dl.crashoverride.run
-SHA256=sha256sum
-SUDO=sudo
-TMP=/tmp
 
 # on osx, sha256sum doesnt exist and instead its shasum
 if ! is_installed "$SHA256"; then
@@ -436,7 +438,7 @@ chalk_version() {
 # find out latest chalk version
 get_latest_version() {
     info Querying latest version of chalk
-    version=$(curl -fsSL "$URL_PREFIX/chalk/current-version.txt")
+    version=$(curl -fsSL "$latest_version_url")
     info Latest version is "$version"
     echo "$version"
 }
@@ -637,56 +639,56 @@ Usage: ${0} [args]
 
 Args:
 
--h / --help         Show this message
---version=*         Chalk version/commit to download.
-                    Default is '${version}'.
-                    If empty and --connect is used,
-                    version is lookedup from CrashOverride profile.
-                    Otherwise default is 'latest'.
---load=*            Comma/newline delimited paths/URLs
-                    of Chalk components to load.
---params=*          JSON of component params to load.
-                    Can be "-" to read params from stdin.
---profile=*         Name of the custom CrashOverride profile
-                    to load. Default is '${profile}'.
---connect           Automatically connect to CrashOverride
-                    via OpenID Connect OIDC.
-                    Currently supports:
-                    * GitHub (requires id-token: write permission)
---oidc=*            When --connect cannot automatically generate
-                    OpenID Connect token, OIDC token can be passed
-                    directly via a parameter or CHALK_OIDC env var.
-                    Currently supports:
-                    * GitLab (requires using id_tokens)
---token=*           CrashOverride API token when OpenID Connect
-                    cannot be used.
---prefix=*          Where to install Chalk and related
-                    binaries. Default is '${prefix}'.
---chalk-path=*      Exact path where to install Chalk.
-                    Default is '$(get_chalk_path)'.
---no-wrap=*         Do not wrap supported binaries.
---debug             Enable debug mode. This enables trace
-                    logs for installed Chalk and will
-                    run setup script in verbose mode.
---[no-]overwrite    Whether to overwrite Chalk binary
-                    if '$(get_chalk_path)' already exists.
-                    Default is '${overwrite}'.
---timeout=*         Timeout for Chalk commands (in seconds).
-                    Default is '${timeout}.
---platforms=*       Download additional Chalk platforms to
-                    '~/.local/chalk/bin/{os}/{arch}/chalk'.
-                    Same notation as docker platform syntax
-                    of '{os}/{arch}'.
---public-key=*      Path to signing public key.
---private-key=*     Path to signing private key encrypted with
-                    CHALK_PASSWORD env var.
---setup             Run Chalk setup. Also setup automatically runs
-                    if --public-key and --private-key are provided.
-
-Args for debugging:
-
---copy-from=*       Instead of downloading Chalk binary
-                    copy it from this path instead.
+-h / --help            Show this message
+--version=*            Chalk version/commit to download.
+                       Default is '${version}'.
+                       If empty and --connect is used,
+                       version is lookedup from CrashOverride profile.
+                       Otherwise default is 'latest'.
+--load=*               Comma/newline delimited paths/URLs
+                       of Chalk components to load.
+--params=*             JSON of component params to load.
+                       Can be "-" to read params from stdin.
+--profile=*            Name of the custom CrashOverride profile
+                       to load. Default is '${profile}'.
+--connect              Automatically connect to CrashOverride
+                       via OpenID Connect OIDC.
+                       Currently supports:
+                       * GitHub (requires id-token: write permission)
+--oidc=*               When --connect cannot automatically generate
+                       OpenID Connect token, OIDC token can be passed
+                       directly via a parameter or CHALK_OIDC env var.
+                       Currently supports:
+                       * GitLab (requires using id_tokens)
+--token=*              CrashOverride API token when OpenID Connect
+                       cannot be used.
+--prefix=*             Where to install Chalk and related
+                       binaries. Default is '${prefix}'.
+--chalk-path=*         Exact path where to install Chalk.
+                       Default is '$(get_chalk_path)'.
+--no-wrap=*            Do not wrap supported binaries.
+--debug                Enable debug mode. This enables trace
+                       logs for installed Chalk and will
+                       run setup script in verbose mode.
+--[no-]overwrite       Whether to overwrite Chalk binary
+                       if '$(get_chalk_path)' already exists.
+                       Default is '${overwrite}'.
+--timeout=*            Timeout for Chalk commands (in seconds).
+                       Default is '${timeout}.
+--platforms=*          Download additional Chalk platforms to
+                       '~/.local/chalk/bin/{os}/{arch}/chalk'.
+                       Same notation as docker platform syntax
+                       of '{os}/{arch}'.
+--public-key=*         Path to signing public key.
+--private-key=*        Path to signing private key encrypted with
+                       CHALK_PASSWORD env var.
+--setup                Run Chalk setup. Also setup automatically runs
+                       if --public-key and --private-key are provided.
+--latest-version-url=* URL to get latest chalk version if
+                       --version is not provided.
+                       Default is '${latest_version_url}'.
+--copy-from=*          Instead of downloading Chalk binary
+                       copy it from this path instead.
 EOF
     exit "${1:-0}"
 }
@@ -696,6 +698,11 @@ for arg; do
     case "$arg" in
         --version=*)
             version=${arg##*=}
+            ;;
+        --latest-version-url=*)
+            if [ -n "${arg##*=}" ]; then
+                latest_version_url=${arg##*=}
+            fi
             ;;
         --load=*)
             load=${arg##*=}

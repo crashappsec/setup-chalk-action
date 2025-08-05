@@ -9,6 +9,11 @@ inputs:
       See https://crashoverride.com/releases for all available versions.
     required: false
     default: ""
+  latest_version_url:
+    description: |
+      URL where to query for the latest chalk version.
+    required: false
+    default: ""
   load:
     description: |
       Chalk config(s) to load - comma or new-line delimited.
@@ -137,6 +142,7 @@ runs:
       run: |
         ${{ steps.action_path.outputs.value }}/setup.sh \
           --version='${{ inputs.version }}' \
+          --latest-version-url='${{ inputs.latest_version_url }}' \
           --load='${{ inputs.load }}' \
           --params='${{ inputs.params }}' \
           --token='${{ inputs.token }}' \
