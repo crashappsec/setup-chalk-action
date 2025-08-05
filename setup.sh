@@ -80,7 +80,7 @@ TMP=/tmp
 # version of chalk to download
 version=${CHALK_VERSION:-}
 # url to fetch latest chalk version
-latest_version_url=$URL_PREFIX/chalk/current-version.txt
+latest_version_url=${CHALK_LATEST_VERSION_URL:-$URL_PREFIX/chalk/current-version.txt}
 # which config to load after install
 load=${CHALK_LOAD:-}
 # json params to load
