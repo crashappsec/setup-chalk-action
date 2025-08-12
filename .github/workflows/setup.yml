@@ -8,43 +8,37 @@ permissions:
 
 env:
   COSIGN_PASSWORD: 6EHvWD1BUk0yWdvm-GGNxA==
+  PUBLIC_KEY: |
+    -----BEGIN PUBLIC KEY-----
+    MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEfH1ovT0O5dYpileubczT0MQsNsDu
+    UhQ1aC2F3S5t48q6bMATGm9IV7Id5/NkUWHjq5mgLX8QhygoSAab+FzEqA==
+    -----END PUBLIC KEY-----
+  PRIVATE_KEY: |
+    -----BEGIN ENCRYPTED SIGSTORE PRIVATE KEY-----
+    eyJrZGYiOnsibmFtZSI6InNjcnlwdCIsInBhcmFtcyI6eyJOIjo2NTUzNiwiciI6
+    OCwicCI6MX0sInNhbHQiOiJkK0JiMUVzVzhWTXVrekZFRmh0QjJZWGZyMm00ckw2
+    MjZGMXc0QWlKVnU0PSJ9LCJjaXBoZXIiOnsibmFtZSI6Im5hY2wvc2VjcmV0Ym94
+    Iiwibm9uY2UiOiJGTFNScFNxRDU1UzhyZVc2ZmxuV0JncDFDay9zUFd0QyJ9LCJj
+    aXBoZXJ0ZXh0IjoiaUNXbHN4WXFrY0Mvb3JmaVRhRlgwdmpZUDdldDFYSmNlWG5G
+    SVZNS0RPMFhsaG13WnkzSWh6VWpYREgvdm1XMFNCMVBkV2lOZDNWZU56VVlkNzZR
+    L3JjWmVsRHQyMlh6ZFJsTnpQeXVudDMrcU40aUcyOFc5M2Z0OFZ4b1I2UkZoVUMy
+    Y0dNbGMxTFJiMjk4ZXA2bU50WFo0aUxGMm5MYWg1dy8xbTVNeTV5WTZqd2ZHd09z
+    MHYzME1uNUhGWDArTm9VQjVzd2U5dUxPZlE9PSJ9
+    -----END ENCRYPTED SIGSTORE PRIVATE KEY-----
 
 jobs:
-  ubuntu:
-    runs-on: ubuntu-latest
+  host:
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+          # - runner: self-hosted
 
-    outputs:
-      PUBLIC_KEY: ${{ steps.key.outputs.PUBLIC_KEY }}
-      PRIVATE_KEY: ${{ steps.key.outputs.PRIVATE_KEY }}
+    runs-on: ${{ matrix.runner }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-
-      - name: Install cosign
-        uses: sigstore/cosign-installer@main
-
-      - name: Generate key
-        run: |
-          cosign \
-            generate-key-pair \
-            --output-key-prefix chalk
-          {
-            echo 'PUBLIC_KEY<<EOF'
-            cat chalk.pub
-            echo EOF
-          } >> "$GITHUB_ENV"
-          {
-            echo 'PRIVATE_KEY<<EOF'
-            cat chalk.key
-            echo EOF
-          } >> "$GITHUB_ENV"
-
-      - name: Export key
-        id: key
-        run: |
-          printf "PUBLIC_KEY<<EOF\n%s\nEOF\n" "${{ env.PUBLIC_KEY }}" >> "$GITHUB_OUTPUT"
-          printf "PRIVATE_KEY<<EOF\n%s\nEOF\n" "${{ env.PRIVATE_KEY }}" >> "$GITHUB_OUTPUT"
 
       - name: Setup Chalk
         uses: ./
@@ -59,22 +53,24 @@ jobs:
         run: |
           echo 'log_level: "trace"' | sudo tee /etc/chalk.conf
           set -x
+          id
           which chalk
           which docker
-          strings $(which chalk) | tail -n 18 | head -n1 | jq
-          strings $(which docker) | tail -n 18 | head -n1 | jq
+          strings $(which chalk) | tail -n 30 | grep dadfedabbadabbed | jq
+          strings $(which docker) | tail -n 30 | grep dadfedabbadabbed  | jq
           chalk version
           docker version
 
   container:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+
+    runs-on: ${{ matrix.runner }}
 
     container:
       image: docker
-
-    # docker containeris alpine-based hence cannot install cosign here directly
-    # as it requires bash
-    needs: [ubuntu] # for cosign
 
     steps:
       - name: Checkout
@@ -88,8 +84,8 @@ jobs:
         uses: ./
         with:
           password: ${{ env.COSIGN_PASSWORD }}
-          public_key: ${{ needs.ubuntu.outputs.PUBLIC_KEY }}
-          private_key: ${{ needs.ubuntu.outputs.PRIVATE_KEY }}
+          public_key: ${{ env.PUBLIC_KEY }}
+          private_key: ${{ env.PRIVATE_KEY }}
           load: |
             .github/config.c4m
 
@@ -97,9 +93,10 @@ jobs:
         run: |
           echo 'log_level: "trace"' | tee /etc/chalk.conf
           set -x
+          id
           which chalk
           which docker
-          strings $(which chalk) | tail -n 18 | head -n1 | jq
-          strings $(which docker) | tail -n 18 | head -n1 | jq
+          strings $(which chalk) | tail -n 30 | grep dadfedabbadabbed | jq
+          strings $(which docker) | tail -n 30 | grep dadfedabbadabbed  | jq
           chalk version
           docker version

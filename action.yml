@@ -63,11 +63,21 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Set temporary folder for chalk to place tmp files in
+      if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS')
+      shell: sh
+      env:
+        ACTION: ${{ github.action_repository }}
+      run: |
+        tmp="$RUNNER_TEMP/${ACTION:-chalk}/$GITHUB_RUN_ID"
+        mkdir -p "$tmp"
+        echo "CHALK_TMP=$(mktemp -d -p "$tmp")" >> $GITHUB_ENV
+
     - name: Set chalk prefix for non-container builds
       if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && job.container.id == ''
       shell: sh
       run: |
-        echo "CHALK_PREFIX=$HOME/.chalk/" >> $GITHUB_ENV
+        echo "CHALK_PREFIX=$CHALK_TMP" >> $GITHUB_ENV
 
     - name: Set chalk prefix for container builds
       if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && job.container.id != ''
@@ -84,14 +94,12 @@ runs:
     - name: Hide provided JWT token
       if: env.__CHALK_ALREADY_SETUP__ == '' && inputs.token != ''
       shell: sh
-      working-directory: ${{ github.action_path }}
       run: |
         echo "::add-mask::${{ inputs.token }}"
 
     - name: Hide provided password
       if: env.__CHALK_ALREADY_SETUP__ == '' && inputs.password != ''
       shell: sh
-      working-directory: ${{ github.action_path }}
       run: |
         echo "::add-mask::${{ inputs.password }}"
 
@@ -112,20 +120,18 @@ runs:
     - name: Save Public Key
       if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && inputs.public_key != ''
       shell: sh
-      working-directory: ${{ github.action_path }}
       env:
         CHALK_PUBLIC_KEY: "${{ inputs.public_key }}"
       run: |
-        printenv CHALK_PUBLIC_KEY > chalk.pub
+        printenv CHALK_PUBLIC_KEY > "$CHALK_TMP/chalk.pub"
 
     - name: Save Private Key
       if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && inputs.private_key != ''
       shell: sh
-      working-directory: ${{ github.action_path }}
       env:
         CHALK_PRIVATE_KEY: "${{ inputs.private_key }}"
       run: |
-        printenv CHALK_PRIVATE_KEY > chalk.key
+        printenv CHALK_PRIVATE_KEY > "$CHALK_TMP/chalk.key"
 
     - name: Determine Action Path
       id: action_path
@@ -134,6 +140,15 @@ runs:
       working-directory: ${{ github.action_path }}
       run: |
         echo "value=$(pwd)" >> $GITHUB_OUTPUT
+
+    # for self-hosted runners home folder is not cleaned up in-between jobs
+    # hence there could be previously-downloaded chalk binaries in there
+    # which should be cleaned up
+    - name: Cleanup previously downloaded chalk binaries
+      if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && runner.environment == 'self-hosted'
+      shell: sh
+      run: |
+        rm -rf ~/.local/chalk/bin || true
 
     - name: Set up chalk
       id: chalk
@@ -148,9 +163,25 @@ runs:
           --token='${{ inputs.token }}' \
           --profile='${{ inputs.profile }}' \
           ${{ inputs.connect == 'true' && '--connect' || '' }} \
-          ${{ inputs.public_key != '' && format('--public-key={0}/chalk.pub', steps.action_path.outputs.value) || '' }} \
-          ${{ inputs.private_key != '' && format('--private-key={0}/chalk.key', steps.action_path.outputs.value) || '' }} \
+          ${{ inputs.public_key != '' && format('--public-key={0}/chalk.pub', env.CHALK_TMP) || '' }} \
+          ${{ inputs.private_key != '' && format('--private-key={0}/chalk.key', env.CHALK_TMP) || '' }} \
           ${{ runner.debug == '1' && '--debug' || '' }}
+
+    - name: Cleanup Public Key
+      if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && inputs.public_key != ''
+      shell: sh
+      env:
+        CHALK_PUBLIC_KEY: "${{ inputs.public_key }}"
+      run: |
+        rm "$CHALK_TMP/chalk.pub"
+
+    - name: Cleanup Private Key
+      if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && inputs.private_key != ''
+      shell: sh
+      env:
+        CHALK_PRIVATE_KEY: "${{ inputs.private_key }}"
+      run: |
+        rm "$CHALK_TMP/chalk.key"
 
     # github doesnt support using inputs for the action version
     # so we template inline action

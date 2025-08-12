@@ -48,18 +48,37 @@ fatal() {
     exit 1
 }
 
-tmp_files=$(command mktemp)
+first_nonempty() {
+    for arg; do
+        shift
+        if [ -n "$arg" ]; then
+            echo "$arg"
+            return 0
+        fi
+    done
+}
+
+TMP=$(
+    first_nonempty \
+        "${CHALK_TMP:-}" \
+        "${TMPDIR:-}" \
+        "${TMP:-}" \
+        "/tmp"
+)
+tmp_files=$(command mktemp -p "$TMP")
 
 mktemp() {
     # shellcheck disable=2068
-    command mktemp -p "${TMPDIR:-${TMP:-/tmp}}" $@ | tee -a "$tmp_files"
+    command mktemp -p "$TMP" $@ | tee -a "$tmp_files"
 }
 
 cleanup() {
-    while IFS= read -r f; do
-        rm "$f" || true
-    done < "$tmp_files"
-    rm "$tmp_files" || true
+    if [ -n "$tmp_files" ]; then
+        while IFS= read -r f; do
+            rm "$f" || true
+        done < "$tmp_files"
+        rm "$tmp_files" || true
+    fi
 }
 
 trap cleanup EXIT INT TERM
@@ -75,7 +94,6 @@ arch=${arch:-$(uname -m)}
 URL_PREFIX=https://dl.crashoverride.run
 SHA256=sha256sum
 SUDO=sudo
-TMP=/tmp
 
 # version of chalk to download
 version=${CHALK_VERSION:-}
@@ -108,8 +126,6 @@ debug=${CHALK_DEBUG:-}
 copy_from=${CHALK_COPY_FROM:-}
 # chalk command timeout
 timeout=${CHALK_TIMEOUT:-60}
-# which platforms to download for multi-platform builds
-platforms=${CHALK_PLATFORMS:-}
 # information for signing
 password=${CHALK_PASSWORD:-}
 public_key=${CHALK_PUBLIC_KEY:-}
@@ -475,7 +491,7 @@ download_chalk() {
     url=$URL_PREFIX/$(chalk_folder)/$name
     info Downloading Chalk from "$url"
     rm -f "$TMP/$name" "$TMP/$name.sha256"
-    wget --quiet --directory-prefix=$TMP "$url" "$url.sha256" || (
+    wget --quiet --directory-prefix="$TMP" "$url" "$url.sha256" || (
         fatal Could not download "$name". Are you sure this is a valid version?
     )
     if ! [ -f "$chalk_tmp" ]; then
@@ -484,7 +500,7 @@ download_chalk() {
     checksum=$(cat "$chalk_tmp.sha256")
     info Validating sha256 checksum "${checksum%% *}"
     (
-        cd $TMP
+        cd "$TMP"
         $SHA256 -c "$chalk_tmp.sha256" > /dev/stderr || (
             error Expected checksum:
             cat "$chalk_tmp.sha256" > /dev/stderr
@@ -504,37 +520,6 @@ install_chalk() {
     $SUDO mkdir -p "$(dirname "$chalk_path")"
     $SUDO cp "$chalk_tmp" "$chalk_path"
     $SUDO chmod +xr "$chalk_tmp"
-}
-
-download_platform() {
-    platform=$1
-    case $platform in
-        */*)
-            os=$(echo "$platform" | cut -d/ -f1)
-            arch=$(echo "$platform" | cut -d/ -f2)
-            ;;
-        *)
-            os=$(uname -s | tr "[:upper:]" "[:lower:]")
-            arch=$platform
-            ;;
-    esac
-    download_chalk
-    if ! [ -f "$chalk_tmp" ]; then
-        return 1
-    fi
-    arch_path=~/.local/chalk/bin/${os}/${arch}/chalk
-    info Copying Chalk "$os/$arch" to "$arch_path"
-    mkdir -p "$(dirname "$arch_path")"
-    cp "$chalk_tmp" "$arch_path"
-    chmod +xr "$arch_path"
-}
-
-normalize_cosign() {
-    if is_installed cosign; then
-        # TODO fix in src/configs/attestation.c4m
-        info Copying cosign to /tmp for Chalk
-        cp "$(which cosign)" /tmp/cosign
-    fi
 }
 
 # load custom Chalk config
@@ -675,10 +660,6 @@ Args:
                        Default is '${overwrite}'.
 --timeout=*            Timeout for Chalk commands (in seconds).
                        Default is '${timeout}.
---platforms=*          Download additional Chalk platforms to
-                       '~/.local/chalk/bin/{os}/{arch}/chalk'.
-                       Same notation as docker platform syntax
-                       of '{os}/{arch}'.
 --public-key=*         Path to signing public key.
 --private-key=*        Path to signing private key encrypted with
                        CHALK_PASSWORD env var.
@@ -757,9 +738,6 @@ for arg; do
         --timeout=*)
             timeout=${arg##*=}
             ;;
-        --platforms=*)
-            platforms=${arg##*=}
-            ;;
         --public-key=*)
             public_key=${arg##*=}
             ;;
@@ -815,16 +793,9 @@ if ! [ -f "$chalk_path" ] || [ -n "$overwrite" ]; then
 
     download_chalk
     install_chalk
-    normalize_cosign
 else
     info "$chalk_path" is already installed. skipping
 fi
-
-for platform in $(echo "$platforms" | tr "," "\n"); do
-    download_platform "$platform" || (
-        warn Chalk will not be able to wrap builds for "$platform"
-    )
-done
 
 if [ -n "$token" ]; then
     load_custom_profile
