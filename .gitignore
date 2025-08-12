@@ -2,3 +2,4 @@ tags
 .envrc
 *.pub
 *.key
+node_modules
