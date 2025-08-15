@@ -590,7 +590,7 @@ wrap_cmd() {
         info Hardlinking "$chalkless_path" to "$existing_path"
         $SUDO ln "$existing_path" "$chalkless_path"
     else
-        info Copying "$chalkless_path" to "$existing_path"
+        info Copying "$existing_path" to "$chalkless_path"
         $SUDO cp "$existing_path" "$chalkless_path"
     fi
 
