@@ -160,7 +160,6 @@ CHALKAPI_HOST=
 if [ -n "${__CHALK_TESTING__:-}" ]; then
     warn Beware - chalk is now using test environment which is meant for internal chalk testing only.
     ENTITLEMENTS_HOST=https://entitlements-test.crashoverride.run
-    CHALKAPI_HOST=https://chalk-test.crashoverride.run
 fi
 
 first_owner() {
