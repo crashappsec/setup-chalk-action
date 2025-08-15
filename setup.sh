@@ -65,7 +65,7 @@ TMP=$(
         "${TMP:-}" \
         "/tmp"
 )
-tmp_files=$(command mktemp -p "$TMP")
+tmp_files=$(command mktemp -u -p "$TMP")
 
 mktemp() {
     # shellcheck disable=2068
@@ -73,7 +73,7 @@ mktemp() {
 }
 
 cleanup() {
-    if [ -n "$tmp_files" ]; then
+    if [ -f "$tmp_files" ]; then
         while IFS= read -r f; do
             rm "$f" || true
         done < "$tmp_files"
@@ -333,7 +333,7 @@ token_via_openid_connect() {
     fi
 }
 
-chalkapi_host() {
+ensure_chalkapi_host() {
     if [ -z "$CHALKAPI_HOST" ]; then
         info Looking up Chalk API host from entitlement service via chalk JWT.
         entitlement_headers=$(mktemp entitlement_headers.XXXXXX)
@@ -354,10 +354,10 @@ chalkapi_host() {
             )
         set_chalkapi_host_from_headers "$entitlement_headers"
     fi
-    echo "$CHALKAPI_HOST"
 }
 
-get_profile_chalk_version() {
+set_profile_chalk_version() {
+    ensure_chalkapi_host
     info Looking up which chalk version to install via Chalk profile from CrashOverride
     result=$(mktemp chalk_version.XXXXXX)
     curl \
@@ -367,8 +367,8 @@ get_profile_chalk_version() {
         --location \
         --request GET \
         --header "Authorization: bearer $token" \
-        "$(chalkapi_host)/v0.1/profile/version?chalkProfileKey=$profile" \
-        | tee "$result" \
+        "$CHALKAPI_HOST/v0.1/profile/version?chalkProfileKey=$profile" \
+        > "$result" \
         || (
             error Could not lookup chalk version to install via Chalk profile.
             fatal "$(cat "$result")"
@@ -378,6 +378,7 @@ get_profile_chalk_version() {
 }
 
 load_custom_profile() {
+    ensure_chalkapi_host
     info Loading custom Chalk profile from CrashOverride
     headers=$(mktemp co_headers.XXXXXX)
     result=$(mktemp co_respose.XXXXXX)
@@ -389,7 +390,7 @@ load_custom_profile() {
         --request POST \
         --header "Authorization: bearer $token" \
         --dump-header "$headers" \
-        "$(chalkapi_host)/v0.1/profile?chalkVersion=$(chalk_version)&chalkProfileKey=$profile&os=$os&architecture=$arch" \
+        "$CHALKAPI_HOST/v0.1/profile?chalkVersion=$(chalk_version)&chalkProfileKey=$profile&os=$os&architecture=$arch" \
         > "$result" \
         || (
             error Could not retrieve custom Chalk profile.
@@ -451,11 +452,10 @@ chalk_version() {
 }
 
 # find out latest chalk version
-get_latest_version() {
+set_latest_version() {
     info Querying latest version of chalk
     version=$(curl -fsSL "$latest_version_url")
     info Latest version is "$version"
-    echo "$version"
 }
 
 # get the folder what to download
@@ -783,11 +783,11 @@ if ! [ -f "$chalk_path" ] || [ -n "$overwrite" ]; then
     fi
 
     if [ -n "$token" ] && [ -z "$version" ]; then
-        version=$(get_profile_chalk_version)
+        set_profile_chalk_version
     fi
 
     if [ -z "$version" ] || [ "$version" = "latest" ]; then
-        version=$(get_latest_version)
+        set_latest_version
     fi
 
     download_chalk
