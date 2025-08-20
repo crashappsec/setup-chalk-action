@@ -76,8 +76,7 @@ TMP=$(
 tmp_files=$(command mktemp -u -p "$TMP")
 
 mktemp() {
-    # shellcheck disable=2068
-    command mktemp -p "$TMP" $@ | tee -a "$tmp_files"
+    command mktemp -p "$TMP" "$@" | tee -a "$tmp_files"
 }
 
 cleanup() {
@@ -157,13 +156,11 @@ fi
 # timeout is missing by default on mac
 if is_installed "timeout"; then
     timeout() {
-        # shellcheck disable=2068
-        command timeout -s KILL "${timeout}s" $@
+        command timeout -s KILL "${timeout}s" "$@"
     }
 else
     timeout() {
-        # shellcheck disable=2068
-        $@
+        "$@"
     }
 fi
 
@@ -178,17 +175,18 @@ retry() {
     cmd=$1
     shift
     first=
+    kwarg=
     for arg; do
-        shift
         case "$arg" in
-            -*)
-                set -- "$@" "$arg"
+            --*)
+                kwarg=true
                 ;;
+            -*) ;;
             *)
-                set -- "$@" "$arg"
-                if [ -z "$first" ]; then
+                if [ -z "$kwarg" ] && [ -z "$first" ]; then
                     first="$arg"
                 fi
+                kwarg=
                 ;;
         esac
     done
@@ -201,17 +199,14 @@ retry() {
     fi
     _retry() {
         if [ -n "$input" ]; then
-            # shellcheck disable=2068
-            command $@ < "$input"
+            command "$@" < "$input"
         else
-            # shellcheck disable=2068
-            command $@
+            command "$@"
         fi
     }
     attempted=0
     sleeping=$retry_sleep
-    # shellcheck disable=2068
-    while ! _retry "$cmd" $@; do
+    while ! _retry "$cmd" "$@"; do
         attempted=$((attempted + 1))
         if [ "$attempted" -lt "$attempts" ]; then
             error \
@@ -227,13 +222,11 @@ retry() {
 }
 
 curl() {
-    # shellcheck disable=2068
-    retry curl $@
+    retry curl "$@"
 }
 
 wget() {
-    # shellcheck disable=2068
-    retry wget $@
+    retry wget "$@"
 }
 
 first_owner() {
