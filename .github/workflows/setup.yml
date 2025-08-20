@@ -80,22 +80,6 @@ jobs:
         run: |
           apk add --no-cache curl jq
 
-      - name: Bad Version
-        continue-on-error: true
-        uses: ./
-        with:
-          # this version doesnt exist and should fail to download but should
-          # show retry logic working
-          version: da39a3ee5e6b4b0d3255bfef95601890afd80709
-
-      - name: Bad config
-        continue-on-error: true
-        uses: ./
-        with:
-          load: |
-            .github/bad_config.c4m
-          params: "[]"
-
       - name: Setup Chalk
         uses: ./
         with:

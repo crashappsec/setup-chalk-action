@@ -48,14 +48,6 @@ fatal() {
     exit 1
 }
 
-plural() {
-    if [ "$1" -gt 1 ]; then
-        echo "${2}s"
-    else
-        echo "${2}"
-    fi
-}
-
 first_nonempty() {
     for arg; do
         shift
@@ -134,10 +126,6 @@ debug=${CHALK_DEBUG:-}
 copy_from=${CHALK_COPY_FROM:-}
 # chalk command timeout
 timeout=${CHALK_TIMEOUT:-60}
-# how many attempts in total to retry a command
-attempts=${CHALK_ATTEMPTS:-3}
-# how long to sleep in-between retryable commands
-retry_sleep=${CHALK_RETRY_SLEEP:-1}
 # information for signing
 password=${CHALK_PASSWORD:-}
 public_key=${CHALK_PUBLIC_KEY:-}
@@ -173,68 +161,6 @@ if [ -n "${__CHALK_TESTING__:-}" ]; then
     warn Beware - chalk is now using test environment which is meant for internal chalk testing only.
     ENTITLEMENTS_HOST=https://entitlements-test.crashoverride.run
 fi
-
-retry() {
-    cmd=$1
-    shift
-    first=
-    for arg; do
-        shift
-        case "$arg" in
-            -*)
-                set -- "$@" "$arg"
-                ;;
-            *)
-                set -- "$@" "$arg"
-                if [ -z "$first" ]; then
-                    first="$arg"
-                fi
-                ;;
-        esac
-    done
-    input=
-    if [ -p /dev/stdin ]; then
-        # save stdin so we can safely retry
-        # otherwise retry is not equivalent
-        input=$(mktemp "$cmd.XXXXXX")
-        cat > "$input"
-    fi
-    _retry() {
-        if [ -n "$input" ]; then
-            # shellcheck disable=2068
-            command $@ < "$input"
-        else
-            # shellcheck disable=2068
-            command $@
-        fi
-    }
-    attempted=0
-    sleeping=$retry_sleep
-    # shellcheck disable=2068
-    while ! _retry "$cmd" $@; do
-        attempted=$((attempted + 1))
-        if [ "$attempted" -lt "$attempts" ]; then
-            error \
-                Retrying after "$attempted" "$(plural "$attempted" attempt)" \
-                in "$sleeping" "$(plural "$sleeping" second)": \
-                "$cmd" "$first"
-            sleep "$sleeping"
-            sleeping=$((sleeping * 2))
-        else
-            return 1
-        fi
-    done
-}
-
-curl() {
-    # shellcheck disable=2068
-    retry curl $@
-}
-
-wget() {
-    # shellcheck disable=2068
-    retry wget $@
-}
 
 first_owner() {
     path=$1
@@ -599,11 +525,11 @@ install_chalk() {
 load_config() {
     to_load=$1
     if [ "$params" = "-" ]; then
-        retry chalk load "$to_load" --params
+        chalk load "$to_load" --params
     elif [ -n "$params" ]; then
-        echo "$params" | retry chalk load "$to_load" --params
+        echo "$params" | chalk load "$to_load" --params
     else
-        retry chalk load "$to_load"
+        chalk load "$to_load"
     fi
     if [ -n "$debug" ]; then
         chalk dump
@@ -733,12 +659,6 @@ Args:
                        Default is '${overwrite}'.
 --timeout=*            Timeout for Chalk commands (in seconds).
                        Default is '${timeout}.
---attempts=*           How many times in total retry retryable commands.
-                       Default is ${attempts}.
---retry-sleep=*        How long to initally sleep in-between
-                       retryable commands (in seconds).
-                       Subsequently sleep time is exponentially increased.
-                       Default is ${retry_sleep}.
 --public-key=*         Path to signing public key.
 --private-key=*        Path to signing private key encrypted with
                        CHALK_PASSWORD env var.
@@ -822,12 +742,6 @@ for arg; do
             ;;
         --private-key=*)
             private_key=${arg##*=}
-            ;;
-        --attempts=*)
-            attempts=${arg##*=}
-            ;;
-        --retry-sleep=*)
-            retry_sleep=${arg##*=}
             ;;
         --help | -h)
             help 0
