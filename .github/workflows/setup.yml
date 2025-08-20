@@ -5,8 +5,10 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 env:
+  __CHALK_TESTING__: "true"
   COSIGN_PASSWORD: 6EHvWD1BUk0yWdvm-GGNxA==
   PUBLIC_KEY: |
     -----BEGIN PUBLIC KEY-----
@@ -108,6 +110,38 @@ jobs:
       - name: Verify Setup
         run: |
           echo 'log_level: "trace"' | tee /etc/chalk.conf
+          set -x
+          id
+          which chalk
+          which docker
+          strings $(which chalk) | tail -n 30 | grep dadfedabbadabbed | jq
+          strings $(which docker) | tail -n 30 | grep dadfedabbadabbed  | jq
+          chalk version
+          docker version
+
+  crashoverride:
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+          # - runner: self-hosted
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Chalk
+        uses: ./
+        with:
+          connect: true
+          load: |
+            .github/config.c4m
+
+      - name: Verify Setup
+        run: |
+          echo 'log_level: "trace"' | sudo tee /etc/chalk.conf
           set -x
           id
           which chalk
