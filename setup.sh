@@ -178,6 +178,10 @@ if [ -n "${__CHALK_TESTING__:-}" ]; then
 fi
 
 retry() {
+    # parsing most important args just for prettier retry error logs
+    # we care about:
+    # * cmd being ran
+    # * first positional arg
     cmd=
     first=
     _kwarg=
