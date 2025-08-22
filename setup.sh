@@ -508,7 +508,7 @@ load_custom_profile() {
             fatal "$(cat "$parameters")"
         )
     params=- load_config "$component" < "$parameters"
-    if [ "$run_setup" = "true" ]; then
+    if [ -z "$saas" ] && [ "$run_setup" = "true" ]; then
         info "Setting up CrashOverride Chalk attestation"
         chalk setup
     fi
@@ -597,8 +597,8 @@ install_chalk() {
     chalk_path=$chalk_tmp chalk version
     info Installing Chalk to "$chalk_path"
     $SUDO mkdir -p "$(dirname "$chalk_path")"
-    $SUDO cp "$chalk_tmp" "$chalk_path"
     $SUDO chmod +xr "$chalk_tmp"
+    $SUDO cp "$chalk_tmp" "$chalk_path"
 }
 
 # load custom Chalk config
@@ -755,6 +755,8 @@ Args:
                        CHALK_PASSWORD env var.
 --setup                Run Chalk setup. Also setup automatically runs
                        if --public-key and --private-key are provided.
+                       Mutually exclusive with --saas as it disables
+                       seting up chalk's attestation.
 --latest-version-url=* URL to get latest chalk version if
                        --version is not provided.
                        Default is '${latest_version_url}'.
@@ -918,11 +920,11 @@ if [ -n "$debug" ]; then
     params='' load_config https://chalkdust.io/debug.c4m
 fi
 
-if [ -n "$password" ] && [ -f "$public_key" ] && [ -f "$private_key" ]; then
+if [ -z "$saas" ] && [ -n "$password" ] && [ -f "$public_key" ] && [ -f "$private_key" ]; then
     info "Loading signing keys into Chalk"
     copy_keys
     chalk setup
-elif [ -n "$setup" ]; then
+elif [ -z "$saas" ] && [ -n "$setup" ]; then
     info "Setting up Chalk attestation"
     chalk setup
 fi
