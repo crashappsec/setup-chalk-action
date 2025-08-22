@@ -146,6 +146,10 @@ private_key=${CHALK_PRIVATE_KEY:-}
 # run chalk setup
 setup=${CHALK_SETUP:-}
 
+do_help=
+chalk_path=
+chalk_tmp=
+
 # on osx, sha256sum doesnt exist and instead its shasum
 if ! is_installed "$SHA256"; then
     SHA256="shasum -a 256"
@@ -174,21 +178,28 @@ if [ -n "${__CHALK_TESTING__:-}" ]; then
 fi
 
 retry() {
-    cmd=$1
-    shift
+    cmd=
     first=
-    kwarg=
+    _kwarg=
     for arg; do
         case "$arg" in
             --*)
-                kwarg=true
+                _kwarg=true
                 ;;
             -*) ;;
             *)
-                if [ -z "$kwarg" ] && [ -z "$first" ]; then
-                    first="$arg"
+                if [ -z "$_kwarg" ]; then
+                    if [ -z "$cmd" ]; then
+                        if [ "$arg" != "command" ]; then
+                            cmd="$arg"
+                        fi
+                    elif [ -z "$first" ]; then
+                        first="$arg"
+                    else
+                        break
+                    fi
                 fi
-                kwarg=
+                _kwarg=
                 ;;
         esac
     done
@@ -201,14 +212,14 @@ retry() {
     fi
     _retry() {
         if [ -n "$input" ]; then
-            command "$@" < "$input"
+            "$@" < "$input"
         else
-            command "$@"
+            "$@"
         fi
     }
     attempted=0
     sleeping=$retry_sleep
-    while ! _retry "$cmd" "$@"; do
+    while ! _retry "$@"; do
         attempted=$((attempted + 1))
         if [ "$attempted" -lt "$attempts" ]; then
             error \
@@ -224,11 +235,11 @@ retry() {
 }
 
 curl() {
-    retry curl "$@"
+    retry command curl "$@"
 }
 
 wget() {
-    retry wget "$@"
+    retry command wget "$@"
 }
 
 first_owner() {
@@ -718,8 +729,10 @@ Args:
                        send reports to SAAS providers CrashOverride workspace.
 --token=*              CrashOverride API token when OpenID Connect
                        cannot be used.
---prefix=*             Where to install Chalk and related
-                       binaries. Default is '${prefix}'.
+--prefix=*             Where to install Chalk and wrapped binaries.
+                       <prefix>/bin is expected to be in PATH.
+                       Wrapped binariess will be copied to <prefix/chalkless.
+                       Default is '${prefix}'.
 --chalk-path=*         Exact path where to install Chalk.
                        Default is '$(get_chalk_path)'.
 --no-wrap=*            Do not wrap supported binaries.
@@ -831,7 +844,7 @@ for arg; do
             retry_sleep=${arg##*=}
             ;;
         --help | -h)
-            help 0
+            do_help=true
             ;;
         *)
             error unsupported arg "$arg"
@@ -841,12 +854,17 @@ for arg; do
     esac
 done
 
+if [ -n "$do_help" ]; then
+    help 0
+fi
+
 if ! echo "$PATH" | tr ":" "\n" | grep "$prefix/bin" > /dev/null; then
     fatal "$prefix/bin" is not part of PATH. "--prefix=<prefix>/bin" must be part of PATH
 fi
 
-chalk_path=$(get_chalk_path)
-chalk_tmp=
+if [ -z "$chalk_path" ]; then
+    chalk_path=$(get_chalk_path)
+fi
 
 if am_owner "$prefix" || [ "$(id -u)" = "0" ]; then
     SUDO=
