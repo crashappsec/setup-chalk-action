@@ -112,6 +112,8 @@ load=${CHALK_LOAD:-}
 params=${CHALK_PARAMS:-}
 # whether to automatically determine token via openid connect
 connect=${CHALK_CONNECT:-}
+# saas connect mode - no sensitive tokens are stored in chalk
+saas=${CHALK_SAAS:-}
 # name of the custom profile to load
 profile=${CHALK_PROFILE:-default}
 # CrashOverride API token
@@ -457,7 +459,7 @@ load_custom_profile() {
         --request POST \
         --header "Authorization: bearer $token" \
         --dump-header "$headers" \
-        "$CHALKAPI_HOST/v0.1/profile?chalkVersion=$(chalk_version)&chalkProfileKey=$profile&os=$os&architecture=$arch" \
+        "$CHALKAPI_HOST/v0.1/profile?chalkVersion=$(chalk_version)&chalkProfileKey=$profile&os=$os&architecture=$arch&saas=${saas:-false}" \
         > "$result" \
         || (
             error Could not retrieve custom Chalk profile.
@@ -711,6 +713,9 @@ Args:
                        directly via a parameter or CHALK_OIDC env var.
                        Currently supports:
                        * GitLab (requires using id_tokens)
+--saas                 Connect chalk in SAAS mode where no sensitive
+                       tokens are stored in chalk but it can still
+                       send reports to SAAS providers CrashOverride workspace.
 --token=*              CrashOverride API token when OpenID Connect
                        cannot be used.
 --prefix=*             Where to install Chalk and related
@@ -762,6 +767,9 @@ for arg; do
             ;;
         --connect)
             connect=true
+            ;;
+        --saas)
+            saas=true
             ;;
         --profile=*)
             profile=${arg##*=}
