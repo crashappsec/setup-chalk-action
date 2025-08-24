@@ -82,7 +82,7 @@ mktemp() {
 cleanup() {
     if [ -f "$tmp_files" ]; then
         while IFS= read -r f; do
-            rm "$f" || true
+            rm "$f"* || true
         done < "$tmp_files"
         rm "$tmp_files" || true
     fi
@@ -580,6 +580,7 @@ download_chalk() {
     if ! [ -f "$chalk_tmp" ]; then
         return 1
     fi
+    echo "$chalk_tmp" >> "$tmp_files"
     checksum=$(cat "$chalk_tmp.sha256")
     info Validating sha256 checksum "${checksum%% *}"
     (
