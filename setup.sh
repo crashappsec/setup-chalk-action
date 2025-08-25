@@ -741,7 +741,7 @@ Args:
 --chalk-path=*         Exact path where to install Chalk.
                        Default is '$(get_chalk_path)'.
 --no-wrap=*            Do not wrap supported binaries.
---debug                Enable debug mode. This enables trace
+--debug/-vv            Enable debug mode. This enables trace
                        logs for installed Chalk and will
                        run setup script in verbose mode.
 --[no-]overwrite       Whether to overwrite Chalk binary
@@ -819,6 +819,9 @@ for arg; do
             ;;
         --no-wrap)
             wrap=
+            ;;
+        -vv)
+            enable_debug
             ;;
         --debug)
             enable_debug
