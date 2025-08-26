@@ -532,7 +532,7 @@ chalk() {
 }
 
 chalk_version() {
-    log_level=none chalk version | grep -i version | head -n1 | awk '{print $5}'
+    log_level=none NO_COLOR=1 chalk version | grep -i version | head -n1 | awk '{print $5}'
 }
 
 # find out latest chalk version
