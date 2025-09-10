@@ -246,8 +246,9 @@ wget() {
     retry command wget "$@"
 }
 
-first_owner() {
+first_permissions() {
     path=$1
+    format=$2
     while
         ! stat "$path" > /dev/null 2>&1
     do
@@ -255,17 +256,54 @@ first_owner() {
     done
     if [ "$os" = "Darwin" ]; then
         # mac uses -f for format instead of -c but on linux -f shows filesystem :shrug:
-        stat -f %u "$path"
+        stat -f "$format""$path"
     else
-        stat -c %u "$path"
+        stat -c "$format" "$path"
     fi
+}
+
+owner_permissions() {
+    path=$1
+    first_permissions "$path" "%A" | cut -c 2-4
+}
+
+group_permissions() {
+    path=$1
+    first_permissions "$path" "%A" | cut -c 5-7
+}
+
+world_permissions() {
+    path=$1
+    first_permissions "$path" "%A" | cut -c 8-10
 }
 
 am_owner() {
     path=$1
     uid=$(id -u)
-    path_uid=$(first_owner "$path")
+    path_uid=$(first_permissions "$path" "%u")
     [ "$uid" = "$path_uid" ]
+}
+
+am_group() {
+    path=$1
+    groups=$(id -G)
+    path_group=$(first_permissions "$path" "%g")
+    echo "$groups" | grep -qw "$path_group"
+}
+
+can_rwx() {
+    path=$1
+    if am_owner "$path" && [ "$(owner_permissions "$path")" = "rwx" ]; then
+        return 0
+    elif am_group "$path" && [ "$(group_permissions "$path")" = "rwx" ]; then
+        return 0
+    fi
+    world=$(world_permissions "$path")
+    # rwt is rwx but with sticky bit like for /tmp
+    if [ "$world" = "rwx" ] || [ "$world" = "rwt" ]; then
+        return 0
+    fi
+    return 1
 }
 
 header_value() {
@@ -873,7 +911,9 @@ if [ -n "$do_help" ]; then
     help 0
 fi
 
-if ! echo "$PATH" | tr ":" "\n" | grep "$prefix/bin" > /dev/null; then
+# if wrapping is enabled $prefix/bin should be on PATH
+# otherwise wrapped commands will not actually be wrapped
+if [ -n "$wrap" ] && ! echo "$PATH" | tr ":" "\n" | grep "$prefix/bin" > /dev/null; then
     fatal "$prefix/bin" is not part of PATH. "--prefix=<prefix>/bin" must be part of PATH
 fi
 
@@ -881,14 +921,19 @@ if [ -z "$chalk_path" ]; then
     chalk_path=$(get_chalk_path)
 fi
 
-if am_owner "$prefix" || [ "$(id -u)" = "0" ]; then
+if [ "$(id -u)" = "0" ] || (can_rwx "$prefix" && can_rwx "$chalk_path"); then
     SUDO=
 else
     if [ -z "$SUDO" ]; then
-        fatal sudo is required to install chalk in "$prefix" as current user "'$(id -un)'" does not own it
+        fatal \
+            sudo is required to install chalk in "$chalk_path" with prefix="$prefix" \
+            as current user "'$(id -un)'" does not own it or doesnt have sufficient permissions
     fi
 fi
 
+if [ -n "$debug" ]; then
+    enable_debug
+fi
 if [ "${ACTIONS_STEP_DEBUG:-}" = "true" ]; then
     enable_debug
 fi
