@@ -27,6 +27,16 @@ env:
     Y0dNbGMxTFJiMjk4ZXA2bU50WFo0aUxGMm5MYWg1dy8xbTVNeTV5WTZqd2ZHd09z
     MHYzME1uNUhGWDArTm9VQjVzd2U5dUxPZlE9PSJ9
     -----END ENCRYPTED SIGSTORE PRIVATE KEY-----
+  SCRIPT: |
+    set -x
+    echo 'log_level: "trace"' | $(which sudo 2> /dev/null) tee /etc/chalk.conf
+    id
+    which chalk
+    which docker
+    strings $(which chalk) | tail -n 30 | grep dadfedabbadabbed | jq
+    strings $(which docker) | tail -n 30 | grep dadfedabbadabbed  | jq
+    chalk version
+    docker version
 
 jobs:
   host:
@@ -52,16 +62,7 @@ jobs:
             .github/config.c4m
 
       - name: Verify Setup
-        run: |
-          echo 'log_level: "trace"' | sudo tee /etc/chalk.conf
-          set -x
-          id
-          which chalk
-          which docker
-          strings $(which chalk) | tail -n 30 | grep dadfedabbadabbed | jq
-          strings $(which docker) | tail -n 30 | grep dadfedabbadabbed  | jq
-          chalk version
-          docker version
+        run: ${{ env.SCRIPT }}
 
   container:
     strategy:
@@ -108,16 +109,7 @@ jobs:
             .github/config.c4m
 
       - name: Verify Setup
-        run: |
-          echo 'log_level: "trace"' | tee /etc/chalk.conf
-          set -x
-          id
-          which chalk
-          which docker
-          strings $(which chalk) | tail -n 30 | grep dadfedabbadabbed | jq
-          strings $(which docker) | tail -n 30 | grep dadfedabbadabbed  | jq
-          chalk version
-          docker version
+        run: ${{ env.SCRIPT }}
 
   crashoverride:
     strategy:
@@ -141,13 +133,4 @@ jobs:
             .github/config.c4m
 
       - name: Verify Setup
-        run: |
-          echo 'log_level: "trace"' | sudo tee /etc/chalk.conf
-          set -x
-          id
-          which chalk
-          which docker
-          strings $(which chalk) | tail -n 30 | grep dadfedabbadabbed | jq
-          strings $(which docker) | tail -n 30 | grep dadfedabbadabbed  | jq
-          chalk version
-          docker version
+        run: ${{ env.SCRIPT }}
