@@ -466,6 +466,7 @@ load_custom_profile() {
     info Loading custom Chalk profile from CrashOverride
     headers=$(mktemp co_headers.XXXXXX)
     result=$(mktemp co_respose.XXXXXX)
+    chalk_version=$(get_chalk_version)
     curl \
         --fail \
         --show-error \
@@ -474,7 +475,7 @@ load_custom_profile() {
         --request POST \
         --header "Authorization: bearer $token" \
         --dump-header "$headers" \
-        "$CHALKAPI_HOST/v0.1/profile?chalkVersion=$(chalk_version)&chalkProfileKey=$profile&os=$os&architecture=$arch&saas=${saas:-false}" \
+        "$CHALKAPI_HOST/v0.1/profile?chalkVersion=$chalk_version&chalkProfileKey=$profile&os=$os&architecture=$arch&saas=${saas:-false}" \
         > "$result" \
         || (
             error Could not retrieve custom Chalk profile.
@@ -531,8 +532,12 @@ chalk() {
     timeout $SUDO "$chalk_path" --log-level="$log_level" --skip-summary-report --skip-command-report "$@"
 }
 
-chalk_version() {
-    log_level=none NO_COLOR=1 chalk version | grep -i version | head -n1 | awk '{print $5}'
+get_chalk_version() {
+    version=$(log_level=none chalk --no-color version | grep -i version | head -n1 | awk '{print $5}')
+    if [ -z "$version" ]; then
+        fatal could not determine chalk version
+    fi
+    echo "$version"
 }
 
 # find out latest chalk version
