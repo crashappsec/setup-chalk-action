@@ -136,6 +136,7 @@ jobs:
         uses: ./
         with:
           connect: true
+          profile: setup-chalk-action
           load: |
             .github/config.c4m
 
