@@ -56,7 +56,7 @@ For example:
 - name: Set up Chalk
   uses: crashappsec/setup-chalk-action@main
   with:
-    version: 0.6.0
+    version: 0.6.1
     latest_version_url: https://dl.crashoverride.run/chalk/current-version.txt
     connect: true
     profile: myprofile
