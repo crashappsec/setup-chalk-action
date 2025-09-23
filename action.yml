@@ -235,7 +235,7 @@ runs:
       env:
         RUN_ID: ${{ job.check_run_id }}
       run: |
-        [ -z "$RUN_ID" ] && echo "GITHUB_CHECK_RUN_ID=$RUN_ID" >> $GITHUB_ENV || true
+        [ -n "$RUN_ID" ] && echo "GITHUB_CHECK_RUN_ID=$RUN_ID" >> $GITHUB_ENV || true
 
     - name: Set chalk was already setup to avoid duplicate setups
       if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS')
