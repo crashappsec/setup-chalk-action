@@ -227,6 +227,16 @@ runs:
       run: |
         [ -z "$GITHUB_TOKEN" ] && echo "GITHUB_TOKEN=${{ github.token }}" >> $GITHUB_ENV || true
 
+    # export check run id (job id) to chalk as otherwise its not available as env var yet
+    # https://github.com/orgs/community/discussions/8945#discussioncomment-14374985
+    - name: Export GITHUB_CHECK_RUN_ID
+      if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS')
+      shell: sh
+      env:
+        RUN_ID: ${{ job.check_run_id }}
+      run: |
+        [ -z "$RUN_ID" ] && echo "GITHUB_CHECK_RUN_ID=$RUN_ID" >> $GITHUB_ENV || true
+
     - name: Set chalk was already setup to avoid duplicate setups
       if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS')
       shell: sh
