@@ -129,6 +129,7 @@ jobs:
         with:
           connect: true
           profile: setup-chalk-action
+          observables_continue_on_error: false
           load: |
             .github/config.c4m
 

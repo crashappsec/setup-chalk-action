@@ -59,6 +59,11 @@ inputs:
       Version of the observables action to use. Defaults to main.
     required: false
     default: main
+  observables_continue_on_error:
+    description: |
+      Whether to continue or fail build when observables setup fails.
+    required: false
+    default: true
 
 runs:
   using: "composite"
@@ -205,7 +210,7 @@ runs:
     - name: Set up build observables
       if: env.__CHALK_ALREADY_SETUP__ == '' && runner.os == 'Linux' && steps.chalk.outputs.setup_build_observables == 'true'
       uses: ./.tmp-observe
-      continue-on-error: true
+      continue-on-error: ${{ inputs.observables_continue_on_error }}
 
     # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow
     # in some cases chalk needs to auth to GitHub API and it requires
