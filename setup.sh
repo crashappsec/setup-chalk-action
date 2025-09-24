@@ -291,6 +291,11 @@ am_group() {
     echo "$groups" | grep -qw "$path_group"
 }
 
+device_of() {
+    path=$1
+    first_permissions "$path" "%d"
+}
+
 can_rwx() {
     path=$1
     if am_owner "$path" && [ "$(owner_permissions "$path")" = "rwx" ]; then
@@ -711,15 +716,21 @@ wrap_cmd() {
 
     info Wrapping "$existing_path" command with Chalk
 
-    $SUDO mkdir -p "$(dirname "$chalkless_path")"
-    if am_owner "$existing_path"; then
-        # hardlinking requires more permissions
-        # so only doing when owning file
-        info Hardlinking "$chalkless_path" to "$existing_path"
-        $SUDO ln "$existing_path" "$chalkless_path"
+    if [ -f "$chalkless_path" ]; then
+        warn Using existing "$chalkless_path" as chalkless command. "$0" most likely already ran before.
     else
-        info Copying "$existing_path" to "$chalkless_path"
-        $SUDO cp "$existing_path" "$chalkless_path"
+        $SUDO mkdir -p "$(dirname "$chalkless_path")"
+        if am_owner "$existing_path" && [ "$(device_of "$chalkless_path")" = "$(device_of "$existing_path")" ]; then
+            # hardlinking requires more permissions
+            # so only doing when owning file
+            # as well as if both files are in the same file-system
+            # otherwise hardlinks cant work so can only copy
+            info Hardlinking "$chalkless_path" to "$existing_path"
+            $SUDO ln "$existing_path" "$chalkless_path"
+        else
+            info Copying "$existing_path" to "$chalkless_path"
+            $SUDO cp "$existing_path" "$chalkless_path"
+        fi
     fi
 
     # create temporary Chalk copy so that we can adjust its configuration
