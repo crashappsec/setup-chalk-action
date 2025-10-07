@@ -208,7 +208,9 @@ retry() {
         esac
     done
     input=
-    if [ -p /dev/stdin ]; then
+    # it is possible for all of setup.sh to be executed under stdin pipe
+    # so instead we use a custom env var while calling retry to indicate stdin needs to be recorded
+    if [ -n "${stdin_pipe:-}" ]; then
         # save stdin so we can safely retry
         # otherwise retry is not equivalent
         input=$(mktemp "$cmd.XXXXXX")
@@ -660,7 +662,7 @@ load_config() {
     if [ "$params" = "-" ]; then
         retry chalk load "$to_load" --params
     elif [ -n "$params" ]; then
-        echo "$params" | retry chalk load "$to_load" --params
+        echo "$params" | stdin_pipe=true retry chalk load "$to_load" --params
     else
         retry chalk load "$to_load"
     fi
