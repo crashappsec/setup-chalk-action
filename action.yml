@@ -115,6 +115,8 @@ runs:
       # most likely bash is missing
       # https://github.com/sigstore/cosign-installer/issues/190
       continue-on-error: true
+      with:
+        cosign-release: v2.2.3
 
     - name: Set CHALK_PASSWORD
       if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && inputs.password != ''
