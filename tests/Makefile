@@ -18,9 +18,9 @@ define SETUP=
 set -x && ./setup.sh
 endef
 define CHECK=
-&& which chalk \
+&& command -v chalk \
 && chalk version \
-&& which docker \
+&& command -v docker \
 && docker --version
 endef
 
@@ -51,8 +51,8 @@ prefix: $(DEPS)
 		$(CHECK) \
 	'
 
-ubuntu alpine:
-	TARGET=$@ docker compose build
+fedora ubuntu alpine:
+	BASE=$@ docker compose build
 
 chalk.key:
 	COSIGN_PASSWORD=$(CHALK_PASSWORD) \

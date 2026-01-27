@@ -92,7 +92,7 @@ trap cleanup EXIT INT TERM
 
 is_installed() {
     name=$1
-    which "$name" > /dev/null 2>&1
+    command -v "$name" > /dev/null 2>&1
 }
 
 os=${os:-$(uname -s)}
@@ -240,13 +240,15 @@ retry() {
     done
 }
 
-curl() {
-    retry command curl "$@"
-}
-
-wget() {
-    retry command wget "$@"
-}
+if ! is_installed curl; then
+    curl() {
+        fatal curl is not installed
+    }
+else
+    curl() {
+        retry command curl "$@"
+    }
+fi
 
 first_permissions() {
     path=$1
@@ -624,8 +626,23 @@ download_chalk() {
     url=$URL_PREFIX/$(chalk_folder)/$name
     info Downloading Chalk from "$url"
     rm -f "$TMP/$name" "$TMP/$name.sha256"
-    wget --quiet --directory-prefix="$TMP" "$url" "$url.sha256" || (
+    curl \
+        --fail \
+        --show-error \
+        --silent \
+        --location \
+        --output "$TMP/$name" \
+        "$url" || (
         fatal Could not download "$name". Are you sure this is a valid version?
+    )
+    curl \
+        --fail \
+        --show-error \
+        --silent \
+        --location \
+        --output "$TMP/$name.sha256" \
+        "$url.sha256" || (
+        fatal Could not download checksum to validate "$name" integrity
     )
     if ! [ -f "$chalk_tmp" ]; then
         return 1
@@ -707,7 +724,7 @@ wrap_cmd() {
         return
     fi
 
-    existing_path=$(which "$cmd")
+    existing_path=$(command -v "$cmd")
     chalked_path="$prefix/bin/$cmd"
     chalkless_path="$prefix/chalkless/$cmd"
 
