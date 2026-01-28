@@ -15,8 +15,11 @@ DEPS+=chalk.key
 endif
 
 define SETUP=
-set -x && ./setup.sh
+set -x &&
 endef
+ifneq "$(NOSUDO)" ""
+SETUP+=sudo rm $$(which sudo) &&
+endif
 define CHECK=
 && command -v chalk \
 && chalk version \
@@ -30,6 +33,7 @@ all: prefix
 default: $(DEPS)
 	$(DOCKER) '\
 		$(SETUP) \
+		./setup.sh \
 		--version=$(VERSION) \
 		--load="$(LOAD)" \
 		--params='$(subst ",\\\",$(PARAMS))' \
@@ -42,13 +46,19 @@ prefix: USER=runner
 prefix: $(DEPS)
 	$(DOCKER) '\
 		$(SETUP) \
+		./setup.sh \
 		--version=$(VERSION) \
 		--load="$(LOAD)" \
 		--params='$(subst ",\\\",$(PARAMS))' \
 		--token=$(TOKEN) \
-		--prefix=~/.chalk/bin \
 		$(ARGS) \
 		$(CHECK) \
+	'
+
+help:
+	$(DOCKER) '\
+		$(SETUP) \
+		./setup.sh --help \
 	'
 
 fedora ubuntu alpine:

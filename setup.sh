@@ -98,9 +98,106 @@ is_installed() {
 os=${os:-$(uname -s)}
 arch=${arch:-$(uname -m)}
 
+first_permissions() {
+    path=$1
+    format=$2
+    while
+        ! stat "$path" > /dev/null 2>&1
+    do
+        path=$(dirname "$path")
+    done
+    if [ "$os" = "Darwin" ]; then
+        # mac uses -f for format instead of -c but on linux -f shows filesystem :shrug:
+        stat -f "$format""$path"
+    else
+        stat -c "$format" "$path"
+    fi
+}
+
+owner_permissions() {
+    path=$1
+    first_permissions "$path" "%A" | cut -c 2-4
+}
+
+group_permissions() {
+    path=$1
+    first_permissions "$path" "%A" | cut -c 5-7
+}
+
+world_permissions() {
+    path=$1
+    first_permissions "$path" "%A" | cut -c 8-10
+}
+
+am_owner() {
+    path=$1
+    uid=$(id -u)
+    path_uid=$(first_permissions "$path" "%u")
+    [ "$uid" = "$path_uid" ]
+}
+
+am_group() {
+    path=$1
+    groups=$(id -G)
+    path_group=$(first_permissions "$path" "%g")
+    echo "$groups" | grep -qw "$path_group"
+}
+
+device_of() {
+    path=$1
+    first_permissions "$path" "%d"
+}
+
+can_rwx() {
+    path=$1
+    if am_owner "$path" && [ "$(owner_permissions "$path")" = "rwx" ]; then
+        return 0
+    elif am_group "$path" && [ "$(group_permissions "$path")" = "rwx" ]; then
+        return 0
+    fi
+    world=$(world_permissions "$path")
+    # rwt is rwx but with sticky bit like for /tmp
+    if [ "$world" = "rwx" ] || [ "$world" = "rwt" ]; then
+        return 0
+    fi
+    return 1
+}
+
 URL_PREFIX=https://dl.crashoverride.run
 SHA256=sha256sum
 SUDO=sudo
+
+# on osx, sha256sum doesnt exist and instead its shasum
+if ! is_installed "$SHA256"; then
+    SHA256="shasum -a 256"
+fi
+
+if ! is_installed sudo; then
+    SUDO=
+fi
+
+# timeout is missing by default on mac
+if is_installed "timeout"; then
+    timeout() {
+        command timeout -s KILL "${timeout}s" "$@"
+    }
+else
+    timeout() {
+        "$@"
+    }
+fi
+
+default_prefix() {
+    if [ "$(id -u)" != "0" ] && [ -z "$SUDO" ]; then
+        for i in $(echo "$PATH" | tr ":" "\n" | sed 's#/bin$##'); do
+            if can_rwx "$i"; then
+                echo "$i"
+                return
+            fi
+        done
+    fi
+    echo /usr/local
+}
 
 # version of chalk to download
 version=${CHALK_VERSION:-}
@@ -121,7 +218,7 @@ token=${CHALK_TOKEN:-}
 # OIDC token used to retrieve chalk token
 oidc=${CHALK_OIDC:-}
 # ${prefix}/bin is where script should install chalk and wrapped commands
-prefix=${CHALK_PREFIX:-/usr/local}
+prefix=${CHALK_PREFIX:-$(default_prefix)}
 # whether to overwrite existing chalk binary
 overwrite=${CHALK_OVERWRITE:-true}
 # whether to wrap external commands with chalk
@@ -149,26 +246,6 @@ setup=${CHALK_SETUP:-}
 do_help=
 chalk_path=
 chalk_tmp=
-
-# on osx, sha256sum doesnt exist and instead its shasum
-if ! is_installed "$SHA256"; then
-    SHA256="shasum -a 256"
-fi
-
-if ! is_installed sudo; then
-    SUDO=
-fi
-
-# timeout is missing by default on mac
-if is_installed "timeout"; then
-    timeout() {
-        command timeout -s KILL "${timeout}s" "$@"
-    }
-else
-    timeout() {
-        "$@"
-    }
-fi
 
 ENTITLEMENTS_HOST=https://entitlements.crashoverride.run
 CHALKAPI_HOST=
@@ -249,71 +326,6 @@ else
         retry command curl "$@"
     }
 fi
-
-first_permissions() {
-    path=$1
-    format=$2
-    while
-        ! stat "$path" > /dev/null 2>&1
-    do
-        path=$(dirname "$path")
-    done
-    if [ "$os" = "Darwin" ]; then
-        # mac uses -f for format instead of -c but on linux -f shows filesystem :shrug:
-        stat -f "$format""$path"
-    else
-        stat -c "$format" "$path"
-    fi
-}
-
-owner_permissions() {
-    path=$1
-    first_permissions "$path" "%A" | cut -c 2-4
-}
-
-group_permissions() {
-    path=$1
-    first_permissions "$path" "%A" | cut -c 5-7
-}
-
-world_permissions() {
-    path=$1
-    first_permissions "$path" "%A" | cut -c 8-10
-}
-
-am_owner() {
-    path=$1
-    uid=$(id -u)
-    path_uid=$(first_permissions "$path" "%u")
-    [ "$uid" = "$path_uid" ]
-}
-
-am_group() {
-    path=$1
-    groups=$(id -G)
-    path_group=$(first_permissions "$path" "%g")
-    echo "$groups" | grep -qw "$path_group"
-}
-
-device_of() {
-    path=$1
-    first_permissions "$path" "%d"
-}
-
-can_rwx() {
-    path=$1
-    if am_owner "$path" && [ "$(owner_permissions "$path")" = "rwx" ]; then
-        return 0
-    elif am_group "$path" && [ "$(group_permissions "$path")" = "rwx" ]; then
-        return 0
-    fi
-    world=$(world_permissions "$path")
-    # rwt is rwx but with sticky bit like for /tmp
-    if [ "$world" = "rwx" ] || [ "$world" = "rwt" ]; then
-        return 0
-    fi
-    return 1
-}
 
 header_value() {
     file=$1
@@ -774,7 +786,7 @@ Setup Chalk:
 
 * Downloads binary
 * Verifies checksum
-* Installs to --prefix
+* Installs to --prefix/bin
 * Wraps supported commands (currently docker)
 
 Usage: ${0} [args]

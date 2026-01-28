@@ -28,3 +28,8 @@ indent_size = 2
 [*.sh]
 indent_style = space
 indent_size = 4
+
+[Makefile]
+end_of_line = lf
+insert_final_newline = true
+indent_style = tab
