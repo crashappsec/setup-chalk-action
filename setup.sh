@@ -856,19 +856,66 @@ EOF
     exit "${1:-0}"
 }
 
+has_value() {
+    if [ $# -eq 0 ]; then
+        return 1
+    fi
+    case "$1" in
+        --*)
+            return 1
+            ;;
+        *)
+            return 0
+            ;;
+    esac
+}
+
 for arg; do
     shift
     case "$arg" in
-        --version=*)
-            version=${arg##*=}
-            ;;
-        --latest-version-url=*)
-            if [ -n "${arg##*=}" ]; then
-                latest_version_url=${arg##*=}
+        =)
+            if ! has_value "$@"; then
+                set -- "$@" ""
             fi
             ;;
-        --load=*)
-            load=${arg##*=}
+        --*=)
+            set -- "$@" "${arg%%=*}"
+            if ! has_value "$@"; then
+                set -- "$@" ""
+            fi
+            ;;
+        =*)
+            set -- "$@" "${arg#*=}"
+            ;;
+        --*=*)
+            set -- "$@" "${arg%%=*}" "${arg#*=}"
+            ;;
+        --*)
+            set -- "$@" "$arg"
+            if ! has_value "$@"; then
+                set -- "$@" ""
+            fi
+            ;;
+        *)
+            set -- "$@" "$arg"
+            ;;
+    esac
+done
+
+n=$#
+while [ "$n" -gt 0 ]; do
+    arg=${1:-}
+    shift
+    n=$((n - 1))
+    case "$arg" in
+        --version)
+            version=$1
+            ;;
+        --latest-version-url)
+            latest_version_url=${1:-$latest_version_url}
+            ;;
+        --load)
+            load=$1
             ;;
         --connect)
             connect=true
@@ -876,31 +923,25 @@ for arg; do
         --saas)
             saas=true
             ;;
-        --profile=*)
-            profile=${arg##*=}
+        --profile)
+            profile=${1:-$profile}
             ;;
-        --token=*)
-            token=${arg##*=}
-            token=$(echo "$token" | tr -d '\n')
+        --token)
+            token=$(echo "$1" | tr -d '\n')
             ;;
-        --oidc=*)
-            oidc=${arg##*=}
-            oidc=$(echo "$oidc" | tr -d '\n')
+        --oidc)
+            oidc=$(echo "$1" | tr -d '\n')
             connect=true
             ;;
-        --params=*)
-            params=${arg##*=}
+        --params)
+            params=$1
             ;;
-        --prefix=*)
-            p=${arg##*=}
-            if [ -n "$p" ]; then
-                prefix=$p
-                prefix=$(echo "$prefix" | sed "s#~#$HOME#" | sed 's/bin$//')
-                prefix=$(realpath "$prefix")
-            fi
+        --prefix)
+            prefix=$(echo "${1:-$prefix}" | sed "s#~#$HOME#" | sed 's/bin$//')
+            prefix=$(realpath "$prefix")
             ;;
-        --chalk-path=*)
-            chalk_path=${arg##*=}
+        --chalk-path)
+            chalk_path=$1
             ;;
         --no-wrap)
             wrap=
@@ -920,31 +961,37 @@ for arg; do
         --no-overwrite)
             overwrite=
             ;;
-        --copy-from=*)
-            copy_from=${arg##*=}
+        --copy-from)
+            copy_from=$1
             ;;
-        --timeout=*)
-            timeout=${arg##*=}
+        --timeout)
+            timeout=${1:-$timeout}
             ;;
-        --public-key=*)
-            public_key=${arg##*=}
+        --public-key)
+            public_key=$1
             ;;
-        --private-key=*)
-            private_key=${arg##*=}
+        --private-key)
+            private_key=$1
             ;;
-        --attempts=*)
-            attempts=${arg##*=}
+        --attempts)
+            attempts=$1
             ;;
-        --retry-sleep=*)
-            retry_sleep=${arg##*=}
+        --retry-sleep)
+            retry_sleep=${1:-$retry_sleep}
             ;;
         --help | -h)
             do_help=true
             ;;
         *)
-            error unsupported arg "$arg"
+            error unsupported arg "'$arg'"
             echo
             help 1
+            ;;
+    esac
+    case "$arg" in
+        --*)
+            n=$((n - 1))
+            shift
             ;;
     esac
 done
