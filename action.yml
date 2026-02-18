@@ -58,7 +58,7 @@ inputs:
     description: |
       Version of the observables action to use. Defaults to main.
     required: false
-    default: main
+    default: vatlidak/testing
 
 runs:
   using: "composite"
