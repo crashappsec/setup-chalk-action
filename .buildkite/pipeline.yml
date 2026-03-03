@@ -1,6 +1,19 @@
 steps:
   - label: ":docker: Build with Chalk"
+    key: "build"
     command: "docker build -f .buildkite/Dockerfile.test -t chalk-test:$$BUILDKITE_BUILD_NUMBER ."
     plugins:
       - ./chalk-buildkite-plugin:
           version: "0.6.5"
+
+  - label: ":mag: Verify Chalk Marks"
+    depends_on: "build"
+    command: |
+      echo "--- :chalk: Extract chalk marks"
+      chalk extract chalk-test:$$BUILDKITE_BUILD_NUMBER
+      echo "--- :label: Docker labels"
+      docker inspect --format='{{json .Config.Labels}}' chalk-test:$$BUILDKITE_BUILD_NUMBER
+    plugins:
+      - ./chalk-buildkite-plugin:
+          version: "0.6.5"
+          no_wrap: true
