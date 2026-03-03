@@ -1,4 +1,4 @@
-@Library('chalk-jenkins-library@main') _
+@Library('chalk-jenkins-library@nettrino/expandbuildpipes') _
 
 pipeline {
     agent {

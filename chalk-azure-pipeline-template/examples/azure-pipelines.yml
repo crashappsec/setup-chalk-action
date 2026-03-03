@@ -1,22 +1,26 @@
 trigger:
   - main
 
+# PoC: templates are in the nettrino/expandbuildpipes branch of setup-chalk-action.
+# Requires a GitHub service connection named 'github-crashappsec' in your Azure DevOps project.
+# Production: switch type to 'git', point at an Azure Repos project, and remove endpoint.
 resources:
   repositories:
     - repository: chalk-templates
-      type: git
-      name: MyOrg/chalk-pipeline-templates
-      ref: refs/tags/v1.0.0
+      type: github
+      name: crashappsec/setup-chalk-action
+      ref: refs/heads/nettrino/expandbuildpipes
+      endpoint: github-crashappsec
 
 variables:
-  - group: chalk-secrets     # Contains CHALK_TOKEN (secret variable)
+  - group: chalk-secrets     # Variable group containing CHALK_TOKEN (secret variable)
 
 pool:
   vmImage: 'ubuntu-latest'
 
 steps:
   - checkout: self
-  - template: templates/install-chalk.yml@chalk-templates
+  - template: chalk-azure-pipeline-template/templates/install-chalk.yml@chalk-templates
     parameters:
       version: '0.6.5'
       connect: true

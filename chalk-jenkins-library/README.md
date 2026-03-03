@@ -5,7 +5,7 @@ A Jenkins Shared Library for installing and configuring [Chalk](https://crashove
 ## Usage
 
 ```groovy
-@Library('chalk-jenkins-library@main') _
+@Library('chalk-jenkins-library@nettrino/expandbuildpipes') _
 
 pipeline {
     agent { label 'linux' }
@@ -42,9 +42,14 @@ pipeline {
 
 ## Setup
 
-1. Create a GitHub repository `chalk-jenkins-library` and push this directory's contents
-2. In Jenkins: Manage Jenkins → Configure System → Global Pipeline Libraries
+1. In Jenkins: Manage Jenkins → Configure System → Global Pipeline Libraries
    - Name: `chalk-jenkins-library`
-   - Default version: `main`
-   - SCM: Git, URL: `https://github.com/crashappsec/chalk-jenkins-library`
-3. Add credential: Kind=Secret text, ID=`chalk-api-token`, value=your Chalk token
+   - Default version: `nettrino/expandbuildpipes`
+   - SCM: Git, URL: `https://github.com/crashappsec/setup-chalk-action`
+   - Library Path: `chalk-jenkins-library/`
+2. Add credential: Kind=Secret text, ID=`chalk-api-token`, value=your Chalk token
+
+> **Production:** Create a dedicated repo `chalk-jenkins-library`, push the contents
+> of this directory there, and update the library URL to
+> `https://github.com/crashappsec/chalk-jenkins-library` with default version `main`.
+> Remove the Library Path setting.

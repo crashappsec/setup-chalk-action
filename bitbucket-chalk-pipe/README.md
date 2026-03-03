@@ -1,8 +1,13 @@
 # bitbucket-chalk-pipe
 
+> **PoC:** Source lives in `bitbucket-chalk-pipe/` on the `nettrino/expandbuildpipes`
+> branch of `crashappsec/setup-chalk-action`. The Docker image
+> `crashappsec/bitbucket-chalk-pipe` has not been published yet. Use **Option B**
+> (direct script) below until the image is built and pushed.
+
 A [Bitbucket Pipe](https://support.atlassian.com/bitbucket-cloud/docs/pipes/) (Docker-based) for installing and configuring [Chalk](https://crashoverride.run) in your Bitbucket Pipelines.
 
-**Docker image:** `crashappsec/bitbucket-chalk-pipe`
+**Docker image:** `crashappsec/bitbucket-chalk-pipe` _(not yet published)_
 
 ## Usage
 
@@ -51,13 +56,25 @@ pipelines:
 | `CHALK_NO_WRAP` | No | Set `true` to skip command wrapping |
 | `CHALK_LOAD` | No | Config URLs to load |
 
-## Setup
+## Setup (PoC — direct script, no Docker image needed)
+
+Copy `examples/consumer-script.yml` as your `bitbucket-pipelines.yml`. It fetches
+`setup.sh` from `crashappsec/setup-chalk-action` directly — no pipe image required.
+
+## Setup (Production — publish the Docker image)
 
 1. Create accounts: Bitbucket.org and Docker Hub
-2. Create Bitbucket repo `bitbucket-chalk-pipe`, enable Pipelines
+2. Clone and push the subdirectory to a new Bitbucket repo:
+   ```bash
+   git clone --branch nettrino/expandbuildpipes \
+     https://github.com/crashappsec/setup-chalk-action.git
+   cd setup-chalk-action/bitbucket-chalk-pipe
+   git init && git add . && git commit -m "initial"
+   git remote add origin git@bitbucket.org:<your-workspace>/bitbucket-chalk-pipe.git
+   git push -u origin main
+   ```
 3. Add repo variables: `CHALK_TOKEN`, `DOCKER_HUB_USERNAME`, `DOCKER_HUB_PASSWORD`
-4. Push this directory's contents, then tag: `git tag v1.0.0 && git push origin v1.0.0`
-5. Build and push image:
+4. Build and push the image:
    ```bash
    docker build -t crashappsec/bitbucket-chalk-pipe:1.0.0 .
    docker push crashappsec/bitbucket-chalk-pipe:1.0.0

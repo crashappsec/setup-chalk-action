@@ -1,32 +1,49 @@
 # Chalk CI/CD Integrations — Setup Guide
 
-This guide covers the manual steps required to deploy Chalk integrations across all supported CI/CD platforms. The code for each integration lives in its respective subdirectory.
+## Current State (PoC)
+
+All integration code lives in subdirectories of this repo on the
+**`nettrino/expandbuildpipes`** branch of
+[`crashappsec/setup-chalk-action`](https://github.com/crashappsec/setup-chalk-action/tree/nettrino/expandbuildpipes).
+No separate repos have been created yet.
+
+| Platform | Subdirectory | Branch path |
+|----------|-------------|-------------|
+| GitLab CI/CD | `chalk-gitlab-component/` | [`nettrino/expandbuildpipes/chalk-gitlab-component`](https://github.com/crashappsec/setup-chalk-action/tree/nettrino/expandbuildpipes/chalk-gitlab-component) |
+| Jenkins | `chalk-jenkins-library/` | [`nettrino/expandbuildpipes/chalk-jenkins-library`](https://github.com/crashappsec/setup-chalk-action/tree/nettrino/expandbuildpipes/chalk-jenkins-library) |
+| Buildkite | `chalk-buildkite-plugin/` | [`nettrino/expandbuildpipes/chalk-buildkite-plugin`](https://github.com/crashappsec/setup-chalk-action/tree/nettrino/expandbuildpipes/chalk-buildkite-plugin) |
+| CircleCI | `chalk-circleci-orb/` | [`nettrino/expandbuildpipes/chalk-circleci-orb`](https://github.com/crashappsec/setup-chalk-action/tree/nettrino/expandbuildpipes/chalk-circleci-orb) |
+| Azure DevOps | `chalk-azure-pipeline-template/` | [`nettrino/expandbuildpipes/chalk-azure-pipeline-template`](https://github.com/crashappsec/setup-chalk-action/tree/nettrino/expandbuildpipes/chalk-azure-pipeline-template) |
+| Bitbucket | `bitbucket-chalk-pipe/` | [`nettrino/expandbuildpipes/bitbucket-chalk-pipe`](https://github.com/crashappsec/setup-chalk-action/tree/nettrino/expandbuildpipes/bitbucket-chalk-pipe) |
+| TeamCity | `chalk-teamcity/` | [`nettrino/expandbuildpipes/chalk-teamcity`](https://github.com/crashappsec/setup-chalk-action/tree/nettrino/expandbuildpipes/chalk-teamcity) |
+
+When each integration is validated, create a dedicated repo for it and update the
+references (see the **Production** note in each platform section below).
+
+---
 
 ## Overview
 
-| Platform | Directory | Integration Type | Priority |
-|----------|-----------|-----------------|----------|
-| GitLab CI/CD | `chalk-gitlab-component/` | Pipeline Execution Policy (Ultimate) / inline (Free) | High |
-| Jenkins | `chalk-jenkins-library/` | Shared Library | High |
-| Buildkite | `chalk-buildkite-plugin/` | Plugin | High |
-| CircleCI | `chalk-circleci-orb/` | Orb | Medium |
-| Azure DevOps | `chalk-azure-pipeline-template/` | YAML Pipeline Template | Medium |
-| Bitbucket | `bitbucket-chalk-pipe/` | Pipe (Docker image) | Medium |
-| TeamCity | `chalk-teamcity/` | Meta-Runner + Kotlin DSL | Low |
+| Platform | Integration Type | Priority |
+|----------|-----------------|----------|
+| GitLab CI/CD | Pipeline Execution Policy (Ultimate) / inline (Free) | High |
+| Jenkins | Shared Library | High |
+| Buildkite | Plugin | High |
+| CircleCI | Orb | Medium |
+| Azure DevOps | YAML Pipeline Template | Medium |
+| Bitbucket | Pipe (Docker image) | Medium |
+| TeamCity | Meta-Runner + Kotlin DSL | Low |
 
-Jenkins, Buildkite, CircleCI, Azure DevOps, Bitbucket, and TeamCity integrations use
-`setup.sh` from this repo at runtime:
+All integrations use `setup.sh` from this repo at runtime via:
 ```
 curl -fsSL https://raw.githubusercontent.com/crashappsec/setup-chalk-action/main/setup.sh
 ```
-The GitLab integration uses direct binary download + explicit c4m config (see below).
 
 ---
 
 ## 1. GitLab CI/CD
 
-**Directory:** `chalk-gitlab-component/`
-**Target repo:** `gitlab.com/your-group/chalk-policy` (the policy project)
+**Source:** `chalk-gitlab-component/` on the `nettrino/expandbuildpipes` branch
 
 Two tiers:
 - **Ultimate**: Pipeline Execution Policy — configure once, applies automatically to all group pipelines
@@ -36,9 +53,11 @@ Two tiers:
 
 1. **Create GitLab account** at gitlab.com (if not already done)
 2. **Create a policy project** in your group, e.g. `your-group/chalk-policy` (can be private)
-3. **Push code:**
+3. **Push the `chalk-gitlab-component/` subdirectory** as the policy project:
    ```bash
-   cd chalk-gitlab-component
+   git clone --branch nettrino/expandbuildpipes \
+     https://github.com/crashappsec/setup-chalk-action.git
+   cd setup-chalk-action/chalk-gitlab-component
    git init && git add . && git commit -m "initial"
    git remote add origin git@gitlab.com:your-group/chalk-policy.git
    git push -u origin main
@@ -52,115 +71,101 @@ Two tiers:
 6. **Link the policy project to your group:**
    - Group → Security → Policies → Edit policy project → select `your-group/chalk-policy`
 
-Every pipeline in the group now gets chalk automatically. No changes needed to any project's `.gitlab-ci.yml`.
+Every pipeline in the group now gets chalk automatically.
 
 ### Free / Premium: Per-Repository
 
-Copy `examples/per-repo.yml` into your repository's `.gitlab-ci.yml` (or merge the
-`before_script`/`after_script` blocks into your existing build job), then set
-`CHALK_POST_URL` as a project-level CI/CD variable.
+Copy `chalk-gitlab-component/examples/per-repo.yml` into your repository's
+`.gitlab-ci.yml` (or merge the `before_script`/`after_script` blocks into your
+existing build job), then set `CHALK_POST_URL` as a project-level CI/CD variable.
+
+> **Production:** Create a dedicated GitLab project `chalk-security-policy` (or similar)
+> and push `chalk-gitlab-component/` there. Update the policy `project:` reference.
 
 ---
 
 ## 2. Jenkins Shared Library
 
-**Directory:** `chalk-jenkins-library/`
-**Target repo:** `github.com/crashappsec/chalk-jenkins-library`
+**Source:** `chalk-jenkins-library/` on the `nettrino/expandbuildpipes` branch
 
-### Steps
+Jenkins supports pointing a shared library directly at a subdirectory of an existing
+repo — no separate repo needed for PoC.
 
-1. **Create GitHub repository** `chalk-jenkins-library` (public)
-2. **Push code:**
-   ```bash
-   cd chalk-jenkins-library
-   git init && git add . && git commit -m "initial"
-   git remote add origin git@github.com:crashappsec/chalk-jenkins-library.git
-   git push -u origin main
-   ```
-3. **Run Jenkins locally** (for PoC):
+1. **Run Jenkins locally:**
    ```bash
    docker run -p 8080:8080 -p 50000:50000 \
      -v jenkins_home:/var/jenkins_home \
      -v /var/run/docker.sock:/var/run/docker.sock \
      jenkins/jenkins:lts-jdk17
    ```
-4. **Complete setup wizard** at http://localhost:8080
-5. **Register the shared library:**
-   - Manage Jenkins → Configure System → Global Pipeline Libraries
+2. **Complete setup wizard** at http://localhost:8080
+3. **Register the shared library** (Manage Jenkins → Configure System → Global Pipeline Libraries):
    - Name: `chalk-jenkins-library`
-   - Default version: `main`
-   - SCM: Git, URL: `https://github.com/crashappsec/chalk-jenkins-library`
-6. **Add credential:**
+   - Default version: `nettrino/expandbuildpipes`
+   - SCM: Git
+   - URL: `https://github.com/crashappsec/setup-chalk-action`
+   - Library Path: `chalk-jenkins-library/`
+4. **Add credential:**
    - Manage Jenkins → Manage Credentials → System → Global
    - Kind: Secret text, ID: `chalk-api-token`, Secret: your Chalk token
-7. **Create Pipeline job** using the example `Jenkinsfile` from `examples/`
+5. **Create Pipeline job** using the example from
+   `chalk-jenkins-library/examples/Jenkinsfile`
+
+> **Production:** Create a dedicated repo `chalk-jenkins-library`, push the subdirectory
+> contents there, and update the library URL and default version to `main`.
 
 ---
 
 ## 3. Buildkite Plugin
 
-**Directory:** `chalk-buildkite-plugin/`
-**Target repo:** `github.com/crashappsec/chalk-buildkite-plugin` (must be public)
+**Source:** `chalk-buildkite-plugin/` on the `nettrino/expandbuildpipes` branch
 
-### Steps
+> **Note:** Buildkite requires the plugin to be in its own public GitHub repository
+> named `<org>/<name>-buildkite-plugin`. The subdirectory approach works for local
+> hook testing only — a dedicated repo is required before referencing it in pipelines
+> as `crashappsec/chalk#v1.0.0`.
 
-1. **Create Buildkite account** at buildkite.com
-2. **Create GitHub repository** `chalk-buildkite-plugin` (public)
-3. **Push code:**
-   ```bash
-   cd chalk-buildkite-plugin
-   git init && git add . && git commit -m "initial"
-   git remote add origin git@github.com:crashappsec/chalk-buildkite-plugin.git
-   git push -u origin main
-   ```
-4. **Install Buildkite agent:**
-   ```bash
-   # macOS
-   brew install buildkite/buildkite/buildkite-agent
-   # Ubuntu
-   curl -fsSL https://keys.openpgp.org/vks/v1/by-fingerprint/32A37959C2FA5C3C99EFBC32A79206696452D198 | gpg --dearmor -o /usr/share/keyrings/buildkite-agent-archive-keyring.gpg
-   echo "deb [signed-by=/usr/share/keyrings/buildkite-agent-archive-keyring.gpg] https://apt.buildkite.com/buildkite-agent stable main" | tee /etc/apt/sources.list.d/buildkite-agent.list
-   apt-get install buildkite-agent
-   ```
-5. **Configure agent** with your Buildkite token, start it
-6. **Create Buildkite pipeline** pointing to your repo
-7. **Add `CHALK_TOKEN`** to pipeline environment variables
-8. **Tag a release:** `git tag v1.0.0 && git push origin v1.0.0`
-
-### Testing Locally
+### Local hook testing (PoC)
 
 ```bash
+git clone --branch nettrino/expandbuildpipes \
+  https://github.com/crashappsec/setup-chalk-action.git
+cd setup-chalk-action/chalk-buildkite-plugin
+
 # Install bats-core
 brew install bats-core   # macOS
 apt-get install bats     # Ubuntu
 
-cd chalk-buildkite-plugin
 bats tests/
 ```
+
+### Running with a Buildkite agent
+
+1. **Create Buildkite account** at buildkite.com
+2. **Install and configure an agent** with your Buildkite token
+3. **Create a pipeline** and reference the plugin from the source directory
+   until `crashappsec/chalk-buildkite-plugin` is created as a dedicated repo
+
+> **Production:** Create a dedicated public repo `crashappsec/chalk-buildkite-plugin`,
+> push `chalk-buildkite-plugin/` there, and tag `v1.0.0`.
 
 ---
 
 ## 4. CircleCI Orb
 
-**Directory:** `chalk-circleci-orb/`
-**Published as:** `crashappsec/chalk` on CircleCI Orb Registry
+**Source:** `chalk-circleci-orb/` on the `nettrino/expandbuildpipes` branch
 
-### Steps
+The orb source can be packed and published from the subdirectory directly — no
+separate GitHub repo needed to publish to the CircleCI Orb Registry.
 
 1. **Create CircleCI account** at circleci.com (connect your GitHub)
 2. **Install CircleCI CLI:**
    ```bash
-   # macOS
-   brew install circleci
-   # Linux
-   curl -fLSs https://raw.githubusercontent.com/CircleCI-Public/circleci-cli/master/install.sh | sudo bash
+   brew install circleci   # macOS
+   curl -fLSs https://raw.githubusercontent.com/CircleCI-Public/circleci-cli/master/install.sh | sudo bash   # Linux
    ```
-3. **Authenticate:**
-   ```bash
-   circleci setup
-   # Enter your CircleCI API token
-   ```
-4. **Create namespace** (one-time, requires GitHub org ownership):
+3. **Authenticate:** `circleci setup`
+4. **Create namespace** (one-time):
    ```bash
    circleci namespace create crashappsec github crashappsec
    ```
@@ -168,85 +173,98 @@ bats tests/
    ```bash
    circleci orb create crashappsec/chalk
    ```
-6. **Create GitHub repository** `chalk-circleci-orb` and push code:
+6. **Clone the branch and publish:**
    ```bash
-   cd chalk-circleci-orb
-   git init && git add . && git commit -m "initial"
-   git remote add origin git@github.com:crashappsec/chalk-circleci-orb.git
-   git push -u origin main
-   ```
-7. **Publish dev version:**
-   ```bash
+   git clone --branch nettrino/expandbuildpipes \
+     https://github.com/crashappsec/setup-chalk-action.git
+   cd setup-chalk-action/chalk-circleci-orb
+
    circleci orb pack src/ > /tmp/chalk-orb.yml
    circleci orb validate /tmp/chalk-orb.yml
    circleci orb publish /tmp/chalk-orb.yml crashappsec/chalk@dev:first
    ```
-8. **Test integration** using the `.circleci/config.yml`
-9. **Promote to production:**
+7. **Promote to production:**
    ```bash
    circleci orb publish promote crashappsec/chalk@dev:first patch
-   # Creates version 1.0.0
    ```
-10. **Add `CHALK_TOKEN`** to CircleCI project environment variables
+8. **Add `CHALK_TOKEN`** to CircleCI project environment variables
+
+> **Production:** Create a dedicated repo `chalk-circleci-orb`, push the subdirectory
+> contents there, and enable CI/CD for automated publishing.
 
 ---
 
 ## 5. Azure DevOps Pipeline Template
 
-**Directory:** `chalk-azure-pipeline-template/`
-**Target:** Azure Repos project `chalk-pipeline-templates`
+**Source:** `chalk-azure-pipeline-template/` on the `nettrino/expandbuildpipes` branch
 
-### Steps
+Azure DevOps can reference templates from a GitHub repository directly via a
+[GitHub service connection](https://learn.microsoft.com/en-us/azure/devops/pipelines/library/service-endpoints?view=azure-devops#github-service-connection)
+— no Azure Repos mirror needed for PoC.
 
-1. **Create Azure DevOps account** at dev.azure.com
-2. **Create organization** (e.g., `crashappsec`)
-3. **Create two projects:**
-   - `chalk-pipeline-templates` (hosts the templates)
-   - `chalk-azure-test` (tests consuming the templates)
-4. **Push code to the templates project:**
-   ```bash
-   cd chalk-azure-pipeline-template
-   git remote add origin https://crashappsec@dev.azure.com/crashappsec/chalk-pipeline-templates/_git/chalk-pipeline-templates
-   git push -u origin main
+1. **Create Azure DevOps account** at dev.azure.com and create an organization
+2. **Create a GitHub service connection** in your Azure DevOps project:
+   - Project Settings → Service connections → New → GitHub
+   - Name it `github-crashappsec`
+3. **Create a Variable Group `chalk-secrets`:**
+   - Pipelines → Library → Variable groups → Add variable `CHALK_TOKEN` (secret)
+4. **Create a pipeline** using the adapted consumer example below:
+   ```yaml
+   resources:
+     repositories:
+       - repository: chalk-templates
+         type: github
+         name: crashappsec/setup-chalk-action
+         ref: refs/heads/nettrino/expandbuildpipes
+         endpoint: github-crashappsec
+
+   variables:
+     - group: chalk-secrets
+
+   steps:
+     - template: chalk-azure-pipeline-template/templates/install-chalk.yml@chalk-templates
+       parameters:
+         version: '0.6.5'
+         connect: true
    ```
-5. **Tag a release:**
-   ```bash
-   git tag v1.0.0 && git push origin v1.0.0
-   ```
-6. **Create Variable Group `chalk-secrets`:**
-   - In `chalk-azure-test` project: Pipelines → Library → Variable groups
-   - Add variable `CHALK_TOKEN` (mark as secret)
-7. **Authorize cross-project access:**
-   - In `chalk-pipeline-templates` project: Project Settings → Repositories
-   - Add `chalk-azure-test` project as reader
-8. **Create pipeline** in `chalk-azure-test` using the example `azure-pipelines.yml`
+5. **Run the pipeline** to validate
+
+> **Production:** Create a dedicated Azure DevOps project `chalk-pipeline-templates`,
+> push `chalk-azure-pipeline-template/` there, and update the `resources.repositories`
+> block to use `type: git` pointing at the Azure Repos project.
 
 ---
 
 ## 6. Bitbucket Pipe
 
-**Directory:** `bitbucket-chalk-pipe/`
-**Docker image:** `crashappsec/bitbucket-chalk-pipe` on Docker Hub
+**Source:** `bitbucket-chalk-pipe/` on the `nettrino/expandbuildpipes` branch
 
-### Steps
+The Docker image (`crashappsec/bitbucket-chalk-pipe`) has not been published yet.
+Use the direct-script approach for PoC — it works without the Docker image and
+references `setup.sh` directly.
 
-1. **Create accounts:**
-   - Bitbucket.org account
-   - Docker Hub account (hub.docker.com)
-2. **Create Bitbucket repository** `bitbucket-chalk-pipe` (public)
-3. **Push code:**
+### Direct-script PoC (recommended until image is published)
+
+Copy `bitbucket-chalk-pipe/examples/consumer-script.yml` as your
+`bitbucket-pipelines.yml`. It uses `setup.sh` from this repo directly, with no
+Docker image required.
+
+### Building and publishing the pipe image
+
+1. **Create a Docker Hub account** (hub.docker.com)
+2. **Create a Bitbucket account** and repository `bitbucket-chalk-pipe` (public)
+3. **Clone and push the subdirectory:**
    ```bash
-   cd bitbucket-chalk-pipe
+   git clone --branch nettrino/expandbuildpipes \
+     https://github.com/crashappsec/setup-chalk-action.git
+   cd setup-chalk-action/bitbucket-chalk-pipe
    git init && git add . && git commit -m "initial"
    git remote add origin git@bitbucket.org:<your-workspace>/bitbucket-chalk-pipe.git
    git push -u origin main
    ```
-4. **Enable Pipelines** in the repository settings
-5. **Add repository variables:**
-   - `CHALK_TOKEN` — your CrashOverride API token
-   - `DOCKER_HUB_USERNAME` — Docker Hub username
-   - `DOCKER_HUB_PASSWORD` — Docker Hub password (mark as secret)
-6. **Build and push Docker image manually** (first time):
+4. **Add repository variables:**
+   - `CHALK_TOKEN`, `DOCKER_HUB_USERNAME`, `DOCKER_HUB_PASSWORD`
+5. **Build and push the image manually:**
    ```bash
    cd bitbucket-chalk-pipe
    docker build -t crashappsec/bitbucket-chalk-pipe:1.0.0 .
@@ -254,57 +272,60 @@ bats tests/
    docker tag crashappsec/bitbucket-chalk-pipe:1.0.0 crashappsec/bitbucket-chalk-pipe:latest
    docker push crashappsec/bitbucket-chalk-pipe:latest
    ```
-7. **Test** by creating a consuming repo with example `consumer-pipe.yml` or `consumer-script.yml`
+
+> **Production:** Publish `crashappsec/bitbucket-chalk-pipe` to Docker Hub and update
+> `consumer-pipe.yml` to reference it as `pipe: docker://crashappsec/bitbucket-chalk-pipe:1.0.0`.
 
 ---
 
 ## 7. TeamCity Meta-Runner
 
-**Directory:** `chalk-teamcity/`
+**Source:** `chalk-teamcity/` on the `nettrino/expandbuildpipes` branch
 
-### Steps
+TeamCity meta-runners are uploaded as XML files — no separate repo needed.
 
-1. **Start local TeamCity** (for PoC):
+1. **Start local TeamCity:**
    ```bash
-   cd chalk-teamcity
+   git clone --branch nettrino/expandbuildpipes \
+     https://github.com/crashappsec/setup-chalk-action.git
+   cd setup-chalk-action/chalk-teamcity
    docker-compose up -d
    ```
-2. **Open** http://localhost:8111 and complete setup wizard:
-   - Choose "Internal (HSQLDB)" database
-   - Accept license agreement
-   - Create admin account
-3. **Authorize the build agent:**
-   - Agents → Unauthorized → Authorize
-4. **Create a project** via Administration → Projects → Create Project
-5. **Upload the Meta-Runner:**
+2. **Open** http://localhost:8111 and complete setup wizard
+3. **Authorize the build agent:** Agents → Unauthorized → Authorize
+4. **Upload the Meta-Runner:**
    - Administration → Meta-Runners → Upload Meta-Runner
    - Upload `.teamcity/chalk-meta-runner.xml`
-6. **Create a build configuration** with these steps:
-   - Step 1: "Setup Chalk" (uses the meta-runner)
-   - Step 2: Your build script
-7. **Add Chalk token:**
-   - In build config: Parameters → Add new parameter
-   - Name: `env.CHALK_TOKEN`, Type: Password
-   - Enter your Chalk token value
-8. **Optional Kotlin DSL:** If using versioned settings (Kotlin DSL):
-   - Enable: Project Settings → Versioned Settings → Synchronization enabled
-   - Copy `.teamcity/settings.kts` to your project's `.teamcity/` directory
-   - Update credential reference `credentialsJSON:chalk-token-id`
+5. **Create a build configuration** with "Setup Chalk" as step 1
+6. **Add password parameter** `env.CHALK_TOKEN`
+
+> **Production:** No dedicated repo required. Upload the meta-runner XML to your
+> TeamCity instance directly.
 
 ---
 
 ## Common Notes
 
 ### Chalk Token
-All platforms require a `CHALK_TOKEN` environment variable or secret. Obtain your token from the [CrashOverride dashboard](https://app.crashoverride.run).
+All platforms require a `CHALK_TOKEN` or CrashOverride OIDC connection. Obtain your
+token from the [CrashOverride dashboard](https://app.crashoverride.run).
 
-### setup.sh Reference
-All integrations download `setup.sh` from:
+### setup.sh
+All integrations use `setup.sh` from the `main` branch of this repo:
 ```
 https://raw.githubusercontent.com/crashappsec/setup-chalk-action/main/setup.sh
 ```
-This script handles OS/arch detection, binary download, checksum verification, and optional command wrapping.
 
-### Supported Platforms
-- Linux x86_64 and aarch64
-- macOS x86_64 (Intel) and arm64 (Apple Silicon)
+### Moving to dedicated repos
+When an integration graduates from PoC, push its subdirectory to a new repo and
+update the one reference that changes per platform:
+
+| Platform | What to update |
+|----------|---------------|
+| GitLab | `project:` in `.gitlab/security-policies/policy.yml` |
+| Jenkins | Library SCM URL and default version in Jenkins config |
+| Buildkite | Plugin reference in pipelines (`crashappsec/chalk#v1.0.0`) |
+| CircleCI | Source repo for CI-triggered publishing |
+| Azure DevOps | `resources.repositories` block (switch `type: github` → `type: git`) |
+| Bitbucket | Docker image tag in `consumer-pipe.yml` |
+| TeamCity | No change needed (XML uploaded directly) |

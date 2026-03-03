@@ -27,9 +27,13 @@ Both approaches use the same pattern:
 
 ### Step 1: Create the policy project
 
-Create a project in your group to hold the Chalk CI configuration, e.g. `your-group/chalk-policy`. Push this directory's contents to it:
+Create a project in your group to hold the Chalk CI configuration, e.g. `your-group/chalk-policy`.
+Clone the `nettrino/expandbuildpipes` branch and push the `chalk-gitlab-component/` subdirectory:
 
 ```bash
+git clone --branch nettrino/expandbuildpipes \
+  https://github.com/crashappsec/setup-chalk-action.git
+cd setup-chalk-action/chalk-gitlab-component
 git init && git add . && git commit -m "initial"
 git remote add origin git@gitlab.com:your-group/chalk-policy.git
 git push -u origin main

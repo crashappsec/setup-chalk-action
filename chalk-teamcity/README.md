@@ -1,5 +1,9 @@
 # chalk-teamcity
 
+> **PoC:** Source lives in `chalk-teamcity/` on the `nettrino/expandbuildpipes`
+> branch of `crashappsec/setup-chalk-action`. No dedicated repo is required —
+> the meta-runner XML is uploaded directly to TeamCity via the UI.
+
 TeamCity Meta-Runner and Kotlin DSL configuration for installing and configuring [Chalk](https://crashoverride.run) in your TeamCity builds.
 
 ## Files
@@ -11,6 +15,9 @@ TeamCity Meta-Runner and Kotlin DSL configuration for installing and configuring
 ## Quick Start (Local TeamCity)
 
 ```bash
+git clone --branch nettrino/expandbuildpipes \
+  https://github.com/crashappsec/setup-chalk-action.git
+cd setup-chalk-action/chalk-teamcity
 docker-compose up -d
 # Open http://localhost:8111
 # Complete setup wizard, choose Internal DB, create admin user
