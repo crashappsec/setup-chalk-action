@@ -27,11 +27,11 @@ CHALK_FLAGS=()
 [[ -n "${CHALK_PROFILE}" ]]   && CHALK_FLAGS+=("--profile=${CHALK_PROFILE}")
 [[ "${CHALK_NO_WRAP}" == "true" ]]  && CHALK_FLAGS+=("--no-wrap")
 
+export PATH="${CHALK_HOME}/bin:${PATH}"
+
 CHALK_PREFIX="${CHALK_HOME}" \
 CHALK_TOKEN="${CHALK_TOKEN}" \
     /tmp/chalk-setup-${BUILDKITE_BUILD_ID}.sh "${CHALK_FLAGS[@]+"${CHALK_FLAGS[@]}"}"
-
-export PATH="${CHALK_HOME}/bin:${PATH}"
 
 if [[ -f "${BUILDKITE_AGENT_ENV_FILE:-}" ]]; then
     echo "PATH=${CHALK_HOME}/bin:${PATH}" >> "${BUILDKITE_AGENT_ENV_FILE}"

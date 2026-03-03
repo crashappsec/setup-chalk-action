@@ -1,6 +1,6 @@
 steps:
   - label: ":docker: Build with Chalk"
-    command: "docker build -f .buildkite/Dockerfile.test -t chalk-test:${BUILDKITE_BUILD_NUMBER} ."
+    command: "docker build -f .buildkite/Dockerfile.test -t chalk-test:$$BUILDKITE_BUILD_NUMBER ."
     plugins:
       - ./chalk-buildkite-plugin:
           version: "0.6.5"
