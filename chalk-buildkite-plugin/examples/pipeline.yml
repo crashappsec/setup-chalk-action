@@ -1,0 +1,19 @@
+steps:
+  - label: ":docker: Build with Chalk"
+    command: "docker build -t myapp:$BUILDKITE_COMMIT ."
+    plugins:
+      - crashappsec/chalk#v1.0.0:
+          version: "0.6.5"
+          connect: true
+          profile: "production"
+    env:
+      CHALK_TOKEN: "${CHALK_TOKEN}"
+
+  - label: ":white_check_mark: Verify Chalk Mark"
+    command: "chalk extract myapp:$BUILDKITE_COMMIT"
+    depends_on: "build-with-chalk"
+    plugins:
+      - crashappsec/chalk#v1.0.0:
+          no_wrap: true
+    env:
+      CHALK_TOKEN: "${CHALK_TOKEN}"

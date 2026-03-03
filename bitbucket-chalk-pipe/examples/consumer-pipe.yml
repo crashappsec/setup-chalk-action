@@ -1,0 +1,14 @@
+image: atlassian/default-image:3
+
+pipelines:
+  default:
+    - step:
+        name: Build with Chalk
+        services:
+          - docker
+        script:
+          - pipe: docker://crashappsec/bitbucket-chalk-pipe:1.0.0
+            variables:
+              CHALK_VERSION: "0.6.5"
+              CHALK_TOKEN: $CHALK_TOKEN
+              CHALK_COMMAND: "chalk wrap -- docker build -t myapp:$BITBUCKET_COMMIT ."

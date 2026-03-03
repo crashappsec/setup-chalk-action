@@ -1,0 +1,83 @@
+# chalk-setup.yml — Docker build instrumentation via chalk
+#
+# Deployed via GitLab Pipeline Execution Policy (Ultimate tier).
+# Re-includes the target project's own CI config so build jobs are preserved.
+include:
+  - project: $CI_PROJECT_PATH
+    ref: $CI_COMMIT_SHA
+    file: $CI_CONFIG_PATH
+    rules:
+      - exists:
+          paths:
+            - '$CI_CONFIG_PATH'
+          project: '$CI_PROJECT_PATH'
+          ref: '$CI_COMMIT_SHA'
+
+default:
+  # Request a GitLab OIDC token so setup.sh can authenticate to CrashOverride
+  # and load the workspace profile (report fields, sinks, chalk version, etc.).
+  id_tokens:
+    CHALK_OIDC:
+      aud: https://crashoverride.run
+
+  before_script:
+    # ── Install chalk via setup.sh ──
+    # Handles binary download with checksum verification, OIDC auth, and
+    # CrashOverride profile loading (which configures reporting).
+    # --no-wrap skips setup.sh's docker wrapping — we do our own below
+    # because the GitLab runner calls `docker sh` internally to set up
+    # after_script, and placing chalk at /usr/bin/docker breaks that.
+    - |
+      apk add --no-cache curl 2>/dev/null || apt-get install -y -qq curl 2>/dev/null || true
+      curl -fsSL \
+        "https://raw.githubusercontent.com/crashappsec/setup-chalk-action/main/setup.sh" \
+        | sh -s -- \
+          --connect \
+          --oidc="${CHALK_OIDC}" \
+          --no-wrap
+
+    # ── Configure chalk for Docker wrapping ──
+    # setup.sh --no-wrap intentionally skips this. We load a minimal 2-line
+    # config so that copies of chalk used in the wrapper below know they are
+    # acting as docker and where to find the real docker binary.
+    - |
+      cat > /tmp/chalk_docker.c4m << 'C4M'
+      default_command = "docker"
+      docker_exe = "/usr/local/bin/chalkless"
+      C4M
+      chalk load /tmp/chalk_docker.c4m
+      rm -f /tmp/chalk_docker.c4m
+
+    # ── Set up selective Docker wrapper ──
+    # Routes build/push through chalk; everything else through real docker.
+    # After `chalk load` above, copies of the chalk binary know to intercept
+    # docker build/push and report. The shell wrapper handles routing so that
+    # `docker sh` (called by GitLab runner internals) bypasses chalk entirely.
+    - |
+      DOCKER_PATH=$(command -v docker)
+      CHALK_BIN=$(command -v chalk)
+      if [ -n "$DOCKER_PATH" ] && [ -n "$CHALK_BIN" ]; then
+        mkdir -p /usr/local/bin/chalkless /usr/local/bin/chalkdocker
+        cp "$DOCKER_PATH" /usr/local/bin/chalkless/docker
+        cp "$CHALK_BIN" /usr/local/bin/chalkdocker/docker
+        cat > /usr/local/bin/docker << 'WRAPPER'
+      #!/bin/sh
+      case "$1" in
+        build|buildx|push)
+          exec /usr/local/bin/chalkdocker/docker "$@"
+          ;;
+        *)
+          exec /usr/local/bin/chalkless/docker "$@"
+          ;;
+      esac
+      WRAPPER
+        chmod +x /usr/local/bin/docker
+        echo "chalk Docker wrapping enabled"
+      fi
+
+  after_script:
+    # Emit completion signal — chalk env produces the 3rd (env) report
+    - |
+      if command -v chalk > /dev/null 2>&1; then
+        chalk env 2>/dev/null || true
+      fi

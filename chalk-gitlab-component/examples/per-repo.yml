@@ -1,0 +1,60 @@
+# Per-repository Chalk integration for GitLab Free / Premium tiers.
+# Add this to your .gitlab-ci.yml — no policy project needed.
+#
+# Set CHALK_POST_URL (or use --connect for the CrashOverride platform) as a
+# project-level CI/CD variable.
+
+build:
+  image: docker:cli
+  stage: build
+  services:
+    - docker:dind
+
+  # Request a GitLab OIDC token for CrashOverride authentication.
+  id_tokens:
+    CHALK_OIDC:
+      aud: https://crashoverride.run
+
+  before_script:
+    # Install chalk via setup.sh (handles download, checksum, OIDC, profile)
+    - apk add --no-cache curl
+    - |
+      curl -fsSL \
+        "https://raw.githubusercontent.com/crashappsec/setup-chalk-action/main/setup.sh" \
+        | sh -s -- \
+          --connect \
+          --oidc="${CHALK_OIDC}" \
+          --no-wrap
+
+    # Load minimal docker wrapping config (2 lines — report config comes from
+    # the CrashOverride profile loaded by setup.sh above)
+    - |
+      cat > /tmp/chalk_docker.c4m << 'C4M'
+      default_command = "docker"
+      docker_exe = "/usr/local/bin/chalkless"
+      C4M
+      chalk load /tmp/chalk_docker.c4m
+      rm -f /tmp/chalk_docker.c4m
+
+    # Set up selective Docker wrapper
+    - |
+      DOCKER_PATH=$(command -v docker)
+      CHALK_BIN=$(command -v chalk)
+      mkdir -p /usr/local/bin/chalkless /usr/local/bin/chalkdocker
+      cp "$DOCKER_PATH" /usr/local/bin/chalkless/docker
+      cp "$CHALK_BIN" /usr/local/bin/chalkdocker/docker
+      cat > /usr/local/bin/docker << 'WRAPPER'
+      #!/bin/sh
+      case "$1" in
+        build|buildx|push) exec /usr/local/bin/chalkdocker/docker "$@" ;;
+        *)                 exec /usr/local/bin/chalkless/docker "$@" ;;
+      esac
+      WRAPPER
+      chmod +x /usr/local/bin/docker
+
+  script:
+    - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA .
+    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+
+  after_script:
+    - chalk env 2>/dev/null || true

@@ -1,0 +1,29 @@
+image: atlassian/default-image:3
+
+definitions:
+  caches:
+    chalk: /tmp/chalk-cache
+
+pipelines:
+  default:
+    - step:
+        name: Build with Chalk
+        caches:
+          - chalk
+        services:
+          - docker
+        script:
+          - |
+            if [ ! -f /tmp/chalk-cache/bin/chalk ]; then
+              mkdir -p /tmp/chalk-cache
+              curl -fsSL \
+                https://raw.githubusercontent.com/crashappsec/setup-chalk-action/main/setup.sh \
+                -o /tmp/chalk-setup.sh
+              chmod +x /tmp/chalk-setup.sh
+              CHALK_PREFIX=/tmp/chalk-cache \
+              CHALK_TOKEN=$CHALK_TOKEN \
+                /tmp/chalk-setup.sh --version=0.6.5 --no-wrap
+            fi
+            export PATH="/tmp/chalk-cache/bin:$PATH"
+            chalk --version
+          - docker build -t myapp:$BITBUCKET_COMMIT .

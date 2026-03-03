@@ -1,0 +1,42 @@
+@Library('chalk-jenkins-library@main') _
+
+pipeline {
+    agent {
+        docker {
+            image 'ubuntu:22.04'
+            args '-v /var/run/docker.sock:/var/run/docker.sock'
+        }
+    }
+
+    environment {
+        CHALK_TOKEN = credentials('chalk-api-token')
+    }
+
+    stages {
+        stage('Install Chalk') {
+            steps {
+                setupChalk(version: '0.6.5')
+            }
+        }
+        stage('Verify') {
+            steps {
+                sh 'chalk --version'
+                sh 'which chalk'
+            }
+        }
+        stage('Build (chalk-wrapped)') {
+            steps {
+                sh '''
+                    echo "FROM alpine:latest" > Dockerfile
+                    docker build -t chalk-test:latest .
+                '''
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}

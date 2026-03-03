@@ -1,0 +1,32 @@
+description: >
+  A convenience job that installs Chalk and then runs a build command.
+
+executor: default
+
+parameters:
+  chalk_version:
+    type: string
+    default: ""
+  chalk_load:
+    type: string
+    default: ""
+  chalk_connect:
+    type: boolean
+    default: false
+  chalk_profile:
+    type: string
+    default: "default"
+  build_command:
+    type: string
+    default: "echo 'No build command specified'"
+
+steps:
+  - checkout
+  - install:
+      version: << parameters.chalk_version >>
+      load: << parameters.chalk_load >>
+      connect: << parameters.chalk_connect >>
+      profile: << parameters.chalk_profile >>
+  - run:
+      name: Build (chalk-wrapped)
+      command: << parameters.build_command >>

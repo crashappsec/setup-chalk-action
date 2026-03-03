@@ -1,0 +1,18 @@
+---
+pipeline_execution_policy:
+  - name: Chalk Build Instrumentation
+    description: >
+      Automatically instruments Docker builds with Chalk across all projects
+      in the group. Produces 3 JSON reports (build, push, env) per pipeline
+      without requiring any changes to individual project .gitlab-ci.yml files.
+    enabled: true
+    pipeline_config_strategy: override_project_ci
+    content:
+      include:
+        - project: your-group/chalk-policy
+          file: /chalk-setup.yml
+          ref: main
+    policy_scope:
+      groups:
+        including:
+          - id: YOUR_GROUP_ID

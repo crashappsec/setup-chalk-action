@@ -1,0 +1,23 @@
+resources:
+  repositories:
+    - repository: chalk-templates
+      type: git
+      name: MyOrg/chalk-pipeline-templates
+      ref: refs/tags/v1.0.0
+
+variables:
+  - group: chalk-secrets
+
+trigger:
+  - main
+
+extends:
+  template: templates/chalk-job.yml@chalk-templates
+  parameters:
+    chalkVersion: '0.6.5'
+    chalkConnect: true
+    buildSteps:
+      - script: docker build -t myapp:$(Build.BuildId) .
+        displayName: Docker Build
+      - script: docker push myapp:$(Build.BuildId)
+        displayName: Docker Push

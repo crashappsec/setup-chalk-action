@@ -1,0 +1,84 @@
+description: >
+  Download and install the Chalk binary, add it to PATH, and optionally configure it.
+
+parameters:
+  version:
+    type: string
+    default: ""
+    description: "Chalk version to install (empty = latest)"
+  load:
+    type: string
+    default: ""
+    description: "Comma/newline-separated config file paths or URLs to load"
+  connect:
+    type: boolean
+    default: false
+    description: "Connect to CrashOverride platform"
+  profile:
+    type: string
+    default: "default"
+    description: "CrashOverride profile name"
+  no_wrap:
+    type: boolean
+    default: false
+    description: "Skip wrapping docker and other commands"
+  install_dir:
+    type: string
+    default: "/usr/local/bin"
+    description: "Directory to install chalk binary into (must be on PATH)"
+  use_cache:
+    type: boolean
+    default: true
+    description: "Cache the chalk binary between runs (speeds up repeat builds)"
+
+steps:
+  - when:
+      condition: << parameters.use_cache >>
+      steps:
+        - restore_cache:
+            name: Restore Chalk binary cache
+            keys:
+              - chalk-v1-<< parameters.version >>-{{ arch }}-{{ checksum "/etc/os-release" }}
+              - chalk-v1-<< parameters.version >>-{{ arch }}-
+              - chalk-v1-<< parameters.version >>-
+
+  - run:
+      name: Install Chalk
+      command: |
+        set -eu
+        INSTALL_DIR="<< parameters.install_dir >>"
+        CHALK_BIN="${INSTALL_DIR}/chalk"
+
+        if [[ -x "${CHALK_BIN}" ]]; then
+          echo "Chalk already installed (cached): $(${CHALK_BIN} --version)"
+          exit 0
+        fi
+
+        curl -fsSL \
+          "https://raw.githubusercontent.com/crashappsec/setup-chalk-action/main/setup.sh" \
+          -o /tmp/chalk-setup.sh
+        chmod +x /tmp/chalk-setup.sh
+
+        CHALK_FLAGS=""
+        [[ -n "<< parameters.version >>" ]] && CHALK_FLAGS="$CHALK_FLAGS --version=<< parameters.version >>"
+        [[ -n "<< parameters.load >>" ]]    && CHALK_FLAGS="$CHALK_FLAGS --load=<< parameters.load >>"
+        [[ "<< parameters.profile >>" != "default" ]] && CHALK_FLAGS="$CHALK_FLAGS --profile=<< parameters.profile >>"
+
+        sudo CHALK_PREFIX="${INSTALL_DIR%/bin}" \
+            CHALK_TOKEN="${CHALK_TOKEN:-}" \
+            /tmp/chalk-setup.sh \
+            $CHALK_FLAGS \
+            <<# parameters.connect >>--connect<</ parameters.connect >> \
+            <<# parameters.no_wrap >>--no-wrap<</ parameters.no_wrap >>
+
+        echo "Chalk installed: $(chalk --version)"
+        rm -f /tmp/chalk-setup.sh
+
+  - when:
+      condition: << parameters.use_cache >>
+      steps:
+        - save_cache:
+            name: Save Chalk binary cache
+            key: chalk-v1-<< parameters.version >>-{{ arch }}-{{ checksum "/etc/os-release" }}
+            paths:
+              - << parameters.install_dir >>/chalk

@@ -1,0 +1,36 @@
+image: atlassian/default-image:3
+
+definitions:
+  steps:
+    - step: &build-pipe-image
+        name: Build and test pipe Docker image
+        services:
+          - docker
+        script:
+          - docker build -t pipe-test:local .
+          - docker run --rm pipe-test:local
+          - docker run --rm -e CHALK_VERSION=0.6.5 pipe-test:local
+          - |
+            if [ "$BITBUCKET_BRANCH" = "main" ] && [ -n "${DOCKER_HUB_PASSWORD:-}" ]; then
+              echo "$DOCKER_HUB_PASSWORD" | docker login -u "$DOCKER_HUB_USERNAME" --password-stdin
+              docker tag pipe-test:local crashappsec/bitbucket-chalk-pipe:latest
+              docker tag pipe-test:local crashappsec/bitbucket-chalk-pipe:${BITBUCKET_TAG:-dev}
+              docker push crashappsec/bitbucket-chalk-pipe:latest
+              docker push crashappsec/bitbucket-chalk-pipe:${BITBUCKET_TAG:-dev}
+            fi
+
+pipelines:
+  default:
+    - step: *build-pipe-image
+  tags:
+    'v*':
+      - step:
+          name: Release pipe image
+          services:
+            - docker
+          script:
+            - echo "$DOCKER_HUB_PASSWORD" | docker login -u "$DOCKER_HUB_USERNAME" --password-stdin
+            - docker build -t crashappsec/bitbucket-chalk-pipe:${BITBUCKET_TAG} .
+            - docker push crashappsec/bitbucket-chalk-pipe:${BITBUCKET_TAG}
+            - docker tag crashappsec/bitbucket-chalk-pipe:${BITBUCKET_TAG} crashappsec/bitbucket-chalk-pipe:latest
+            - docker push crashappsec/bitbucket-chalk-pipe:latest

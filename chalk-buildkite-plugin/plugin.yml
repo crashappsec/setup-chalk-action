@@ -1,0 +1,31 @@
+name: Chalk
+description: >-
+  Install and configure Chalk for build artifact observability.
+  Wraps build commands to capture metadata and chalk-mark artifacts.
+author: https://github.com/crashappsec
+requirements: []
+configuration:
+  properties:
+    version:
+      type: string
+      description: "Chalk version to install (default: latest)"
+    load:
+      type: string
+      description: "Comma/newline-separated config file paths or URLs to load"
+    connect:
+      type: boolean
+      default: false
+      description: "Connect to CrashOverride platform via token"
+    profile:
+      type: string
+      default: "default"
+      description: "CrashOverride profile name"
+    no_wrap:
+      type: boolean
+      default: false
+      description: "Skip wrapping docker and other commands"
+    install_dir:
+      type: string
+      default: ""
+      description: "Override installation directory (default: build-specific temp dir)"
+  additionalProperties: false

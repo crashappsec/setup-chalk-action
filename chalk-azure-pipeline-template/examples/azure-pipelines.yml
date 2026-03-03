@@ -1,0 +1,27 @@
+trigger:
+  - main
+
+resources:
+  repositories:
+    - repository: chalk-templates
+      type: git
+      name: MyOrg/chalk-pipeline-templates
+      ref: refs/tags/v1.0.0
+
+variables:
+  - group: chalk-secrets     # Contains CHALK_TOKEN (secret variable)
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+  - checkout: self
+  - template: templates/install-chalk.yml@chalk-templates
+    parameters:
+      version: '0.6.5'
+      connect: true
+      profile: 'production'
+  - script: |
+      chalk --version
+      docker build -t myapp:$(Build.BuildId) .
+    displayName: 'Build with Chalk'

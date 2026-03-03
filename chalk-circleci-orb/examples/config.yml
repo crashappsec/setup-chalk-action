@@ -1,0 +1,23 @@
+version: 2.1
+
+orbs:
+  chalk: crashappsec/chalk@1.0.0
+
+jobs:
+  build:
+    docker:
+      - image: cimg/base:current
+    steps:
+      - checkout
+      - chalk/install:
+          version: "0.6.5"
+          connect: true
+      - run:
+          name: Build Docker image
+          command: |
+            docker build -t myapp:$CIRCLE_SHA1 .
+
+workflows:
+  main:
+    jobs:
+      - build

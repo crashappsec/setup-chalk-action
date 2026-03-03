@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+CHALK_HOME="${CHALK_HOME:-}"
+
+if [[ -n "${CHALK_HOME}" ]] && [[ -f "${CHALK_HOME}/bin/chalk" ]]; then
+    echo "--- :chalk: Chalk ready: $(chalk --version)"
+elif command -v chalk >/dev/null 2>&1; then
+    echo "--- :chalk: Chalk found in PATH: $(chalk --version)"
+else
+    echo "~~~ :warning: Chalk not found — was the environment hook skipped?"
+fi

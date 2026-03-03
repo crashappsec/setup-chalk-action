@@ -1,0 +1,44 @@
+parameters:
+  - name: jobName
+    type: string
+    default: 'BuildWithChalk'
+  - name: displayName
+    type: string
+    default: 'Build with Chalk'
+  - name: vmImage
+    type: string
+    default: 'ubuntu-latest'
+  - name: chalkVersion
+    type: string
+    default: ''
+  - name: chalkLoad
+    type: string
+    default: ''
+  - name: chalkConnect
+    type: boolean
+    default: false
+  - name: chalkProfile
+    type: string
+    default: 'default'
+  - name: buildSteps
+    type: stepList
+    default: []
+  - name: dependsOn
+    type: object
+    default: []
+
+jobs:
+  - job: ${{ parameters.jobName }}
+    displayName: ${{ parameters.displayName }}
+    dependsOn: ${{ parameters.dependsOn }}
+    pool:
+      vmImage: ${{ parameters.vmImage }}
+    steps:
+      - template: install-chalk.yml
+        parameters:
+          version: ${{ parameters.chalkVersion }}
+          load: ${{ parameters.chalkLoad }}
+          connect: ${{ parameters.chalkConnect }}
+          profile: ${{ parameters.chalkProfile }}
+      - ${{ each step in parameters.buildSteps }}:
+        - ${{ step }}

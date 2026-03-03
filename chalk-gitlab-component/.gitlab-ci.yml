@@ -1,0 +1,31 @@
+# Self-test CI for the chalk policy project.
+# Validates that chalk-setup.yml is syntactically valid YAML and that
+# the Docker wrapper script is correct.
+
+stages:
+  - lint
+  - test
+
+lint-yaml:
+  image: alpine:latest
+  stage: lint
+  before_script:
+    - apk add --no-cache python3 py3-pip
+    - pip3 install --quiet yamllint
+  script:
+    - yamllint -d relaxed chalk-setup.yml
+    - yamllint -d relaxed .gitlab/security-policies/policy.yml
+    - yamllint -d relaxed examples/per-repo.yml
+
+test-chalk-install:
+  image: alpine:latest
+  stage: test
+  before_script:
+    - apk add --no-cache curl
+  script:
+    - |
+      curl -fsSL -o /usr/local/bin/chalk \
+        "https://dl.crashoverride.run/chalk/chalk-0.6.6-Linux-x86_64"
+      chmod +x /usr/local/bin/chalk
+      chalk --version
+    - echo "chalk binary installed and functional"

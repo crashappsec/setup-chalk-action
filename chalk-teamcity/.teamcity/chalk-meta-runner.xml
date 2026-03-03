@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<meta-runner name="Setup Chalk">
+  <description>Download and install Chalk for build artifact observability. Wraps Docker and other build commands.</description>
+  <run-type>meta-runner</run-type>
+  <parameters>
+    <param name="chalk.version"
+           value=""
+           spec="type=text label='Chalk Version' description='Version to install. Leave empty for latest.' display=normal"/>
+    <param name="chalk.load"
+           value=""
+           spec="type=text label='Config URL(s)' description='Comma-separated config file paths or URLs to load.' display=normal"/>
+    <param name="chalk.profile"
+           value="default"
+           spec="type=text label='Profile' description='CrashOverride profile name.' display=normal"/>
+    <param name="chalk.connect"
+           value="false"
+           spec="type=checkbox label='Connect to CrashOverride' checkedValue=true uncheckedValue=false display=normal"/>
+    <param name="chalk.no_wrap"
+           value="false"
+           spec="type=checkbox label='Skip command wrapping' checkedValue=true uncheckedValue=false display=normal"/>
+    <param name="chalk.prefix"
+           value="/usr/local"
+           spec="type=text label='Install Prefix' description='Installation prefix (default: /usr/local).' display=normal"/>
+  </parameters>
+  <build-runners>
+    <runner name="Download and install Chalk" type="simpleRunner">
+      <parameters>
+        <param name="use.custom.script" value="true"/>
+        <param name="script.content"><![CDATA[
+#!/usr/bin/env bash
+set -eu
+
+curl -fsSL \
+    "https://raw.githubusercontent.com/crashappsec/setup-chalk-action/main/setup.sh" \
+    -o /tmp/chalk-setup.sh
+chmod +x /tmp/chalk-setup.sh
+
+CHALK_FLAGS=""
+[ -n "%chalk.version%" ]             && CHALK_FLAGS="$CHALK_FLAGS --version=%chalk.version%"
+[ -n "%chalk.load%" ]                && CHALK_FLAGS="$CHALK_FLAGS --load=%chalk.load%"
+[ "%chalk.profile%" != "default" ]   && CHALK_FLAGS="$CHALK_FLAGS --profile=%chalk.profile%"
+[ "%chalk.connect%" = "true" ]       && CHALK_FLAGS="$CHALK_FLAGS --connect"
+[ "%chalk.no_wrap%" = "true" ]       && CHALK_FLAGS="$CHALK_FLAGS --no-wrap"
+
+CHALK_PREFIX="%chalk.prefix%" \
+CHALK_TOKEN="%env.CHALK_TOKEN%" \
+    /tmp/chalk-setup.sh $CHALK_FLAGS
+
+"%chalk.prefix%/bin/chalk" --version
+rm -f /tmp/chalk-setup.sh
+        ]]></param>
+      </parameters>
+    </runner>
+  </build-runners>
+</meta-runner>

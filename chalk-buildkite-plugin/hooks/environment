@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PLUGIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+echo "--- :chalk: Setting up Chalk"
+
+CHALK_HOME="${BUILDKITE_PLUGIN_CHALK_INSTALL_DIR:-${BUILDKITE_BUILD_PATH}/.chalk-${BUILDKITE_BUILD_ID}}"
+mkdir -p "${CHALK_HOME}/bin"
+
+CHALK_VERSION="${BUILDKITE_PLUGIN_CHALK_VERSION:-}"
+CHALK_LOAD="${BUILDKITE_PLUGIN_CHALK_LOAD:-}"
+CHALK_CONNECT="${BUILDKITE_PLUGIN_CHALK_CONNECT:-false}"
+CHALK_PROFILE="${BUILDKITE_PLUGIN_CHALK_PROFILE:-default}"
+CHALK_NO_WRAP="${BUILDKITE_PLUGIN_CHALK_NO_WRAP:-false}"
+CHALK_TOKEN="${CHALK_TOKEN:-}"
+
+curl -fsSL \
+    "https://raw.githubusercontent.com/crashappsec/setup-chalk-action/main/setup.sh" \
+    -o /tmp/chalk-setup-${BUILDKITE_BUILD_ID}.sh
+chmod +x /tmp/chalk-setup-${BUILDKITE_BUILD_ID}.sh
+
+CHALK_FLAGS=()
+[[ -n "${CHALK_VERSION}" ]]   && CHALK_FLAGS+=("--version=${CHALK_VERSION}")
+[[ -n "${CHALK_LOAD}" ]]      && CHALK_FLAGS+=("--load=${CHALK_LOAD}")
+[[ "${CHALK_CONNECT}" == "true" ]]  && CHALK_FLAGS+=("--connect")
+[[ -n "${CHALK_PROFILE}" ]]   && CHALK_FLAGS+=("--profile=${CHALK_PROFILE}")
+[[ "${CHALK_NO_WRAP}" == "true" ]]  && CHALK_FLAGS+=("--no-wrap")
+
+CHALK_PREFIX="${CHALK_HOME}" \
+CHALK_TOKEN="${CHALK_TOKEN}" \
+    /tmp/chalk-setup-${BUILDKITE_BUILD_ID}.sh "${CHALK_FLAGS[@]+"${CHALK_FLAGS[@]}"}"
+
+export PATH="${CHALK_HOME}/bin:${PATH}"
+
+if [[ -f "${BUILDKITE_AGENT_ENV_FILE:-}" ]]; then
+    echo "PATH=${CHALK_HOME}/bin:${PATH}" >> "${BUILDKITE_AGENT_ENV_FILE}"
+    echo "CHALK_HOME=${CHALK_HOME}" >> "${BUILDKITE_AGENT_ENV_FILE}"
+else
+    export CHALK_HOME="${CHALK_HOME}"
+fi
+
+echo "Chalk installed successfully: $(chalk --version)"
+rm -f /tmp/chalk-setup-${BUILDKITE_BUILD_ID}.sh

@@ -1,0 +1,62 @@
+parameters:
+  - name: version
+    displayName: Chalk Version
+    type: string
+    default: ''
+  - name: load
+    displayName: Config URL(s) to load
+    type: string
+    default: ''
+  - name: connect
+    displayName: Connect to CrashOverride
+    type: boolean
+    default: false
+  - name: profile
+    displayName: CrashOverride Profile
+    type: string
+    default: 'default'
+  - name: noWrap
+    displayName: Skip command wrapping
+    type: boolean
+    default: false
+  - name: chalkTokenVar
+    displayName: Name of the pipeline variable containing the Chalk token
+    type: string
+    default: 'CHALK_TOKEN'
+
+steps:
+  - bash: |
+      set -eu
+
+      CHALK_HOME="$(Agent.TempDirectory)/chalk-$$"
+      mkdir -p "${CHALK_HOME}/bin"
+
+      curl -fsSL \
+        "https://raw.githubusercontent.com/crashappsec/setup-chalk-action/main/setup.sh" \
+        -o /tmp/chalk-setup.sh
+      chmod +x /tmp/chalk-setup.sh
+
+      CHALK_FLAGS=""
+      [[ -n "$CHALK_VERSION_PARAM" ]]  && CHALK_FLAGS="$CHALK_FLAGS --version=${CHALK_VERSION_PARAM}"
+      [[ -n "$CHALK_LOAD_PARAM" ]]     && CHALK_FLAGS="$CHALK_FLAGS --load=${CHALK_LOAD_PARAM}"
+      [[ -n "$CHALK_PROFILE_PARAM" ]]  && CHALK_FLAGS="$CHALK_FLAGS --profile=${CHALK_PROFILE_PARAM}"
+      [[ "$CHALK_CONNECT_PARAM" == "True" ]] && CHALK_FLAGS="$CHALK_FLAGS --connect"
+      [[ "$CHALK_NOWRAP_PARAM" == "True" ]]  && CHALK_FLAGS="$CHALK_FLAGS --no-wrap"
+
+      CHALK_PREFIX="${CHALK_HOME}" \
+      CHALK_TOKEN="${CHALK_TOKEN_SECRET:-}" \
+        /tmp/chalk-setup.sh $CHALK_FLAGS
+
+      echo "Chalk installed: $("${CHALK_HOME}/bin/chalk" --version)"
+      echo "##vso[task.prependpath]${CHALK_HOME}/bin"
+      echo "##vso[task.setvariable variable=CHALK_HOME;]${CHALK_HOME}"
+
+      rm -f /tmp/chalk-setup.sh
+    displayName: 'Install Chalk'
+    env:
+      CHALK_VERSION_PARAM: '${{ parameters.version }}'
+      CHALK_LOAD_PARAM: '${{ parameters.load }}'
+      CHALK_PROFILE_PARAM: '${{ parameters.profile }}'
+      CHALK_CONNECT_PARAM: '${{ parameters.connect }}'
+      CHALK_NOWRAP_PARAM: '${{ parameters.noWrap }}'
+      CHALK_TOKEN_SECRET: $(${{ parameters.chalkTokenVar }})

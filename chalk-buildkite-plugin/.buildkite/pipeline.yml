@@ -1,0 +1,9 @@
+steps:
+  - label: ":hammer: Test Plugin (Ubuntu)"
+    command: "bats tests/"
+    agents:
+      os: linux
+  - label: ":apple: Test Plugin (macOS)"
+    command: "bats tests/"
+    agents:
+      os: macos
