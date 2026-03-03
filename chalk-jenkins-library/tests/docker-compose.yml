@@ -1,0 +1,17 @@
+services:
+  jenkins:
+    build:
+      context: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ../vars:/var/jenkins_library_src/vars:ro
+      - ../resources:/var/jenkins_library_src/resources:ro
+      - ./jenkins.yaml:/var/jenkins_casc/jenkins.yaml:ro
+      - ../../setup.sh:/var/chalk-setup/setup.sh:ro
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/login"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s

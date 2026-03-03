@@ -1,0 +1,63 @@
+jenkins:
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "admin"
+          password: "admin"
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: true
+  numExecutors: 2
+
+security:
+  globalJobDslSecurityConfiguration:
+    useScriptSecurity: false
+
+unclassified:
+  globalLibraries:
+    libraries:
+      - name: "chalk-jenkins-library"
+        defaultVersion: "main"
+        implicit: false
+        allowVersionOverride: true
+        retriever:
+          modernSCM:
+            scm:
+              git:
+                remote: "file:///var/jenkins_library_repo"
+
+jobs:
+  - script: |
+      pipelineJob('chalk-e2e-test') {
+        definition {
+          cps {
+            script('''
+              @Library('chalk-jenkins-library') _
+
+              pipeline {
+                agent any
+                stages {
+                  stage('Setup Chalk') {
+                    steps {
+                      script {
+                        // Pre-add chalk prefix to PATH so setup.sh wrap check passes
+                        def chalkPrefix = "^${env.WORKSPACE}/chalk-home"
+                        env.PATH = "^${chalkPrefix}/bin:^${env.PATH}"
+                      }
+                      setupChalk(version: '0.6.5')
+                    }
+                  }
+                  stage('Verify Chalk') {
+                    steps {
+                      sh 'chalk version'
+                      sh 'which chalk'
+                    }
+                  }
+                }
+              }
+            '''.stripIndent())
+            sandbox(true)
+          }
+        }
+      }
