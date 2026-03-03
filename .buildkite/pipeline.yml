@@ -2,7 +2,7 @@ steps:
   - label: ":docker: Build and Verify Chalk"
     command: |
       echo "--- :docker: Build with Chalk"
-      docker build -f .buildkite/Dockerfile.test -t chalk-test:$$BUILDKITE_BUILD_NUMBER .
+      docker build --load -f .buildkite/Dockerfile.test -t chalk-test:$$BUILDKITE_BUILD_NUMBER .
       echo "--- :chalk: Extract chalk marks"
       chalk extract chalk-test:$$BUILDKITE_BUILD_NUMBER
       echo "--- :label: Docker labels"
