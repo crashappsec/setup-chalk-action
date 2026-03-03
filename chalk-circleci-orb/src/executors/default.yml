@@ -1,0 +1,4 @@
+description: Default executor for Chalk orb jobs (Debian-based Docker image)
+
+docker:
+  - image: cimg/base:current

@@ -1,0 +1,27 @@
+version: 2.1
+
+orbs:
+  chalk: crashappsec/chalk@dev:first
+
+jobs:
+  build:
+    docker:
+      - image: cimg/base:current
+    steps:
+      - checkout
+      - setup_remote_docker
+      - chalk/install:
+          version: "0.6.5"
+      - run:
+          name: Build Docker image
+          command: docker build --load -f .circleci/Dockerfile.test -t chalk-test:$CIRCLE_SHA1 .
+      - run:
+          name: Verify Chalk marks
+          command: |
+            chalk extract chalk-test:$CIRCLE_SHA1
+            docker inspect --format='{{json .Config.Labels}}' chalk-test:$CIRCLE_SHA1
+
+workflows:
+  main:
+    jobs:
+      - build
