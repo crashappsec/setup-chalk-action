@@ -8,5 +8,5 @@ steps:
       echo "--- :label: Docker labels"
       docker inspect --format='{{json .Config.Labels}}' chalk-test:$$BUILDKITE_BUILD_NUMBER
     plugins:
-      - ./chalk-buildkite-plugin:
+      - ./buildkite:
           version: "0.6.5"

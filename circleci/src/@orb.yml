@@ -3,9 +3,9 @@ description: |
   Install and configure Chalk for build artifact observability and metadata capture.
   Wraps build commands (e.g. docker build) to automatically chalk-mark artifacts.
 
-  Source: https://github.com/crashappsec/chalk-circleci-orb
+  Source: https://github.com/crashappsec/chalk-circleci
   Chalk docs: https://crashoverride.run/docs
 
 display:
-  source_url: https://github.com/crashappsec/chalk-circleci-orb
+  source_url: https://github.com/crashappsec/chalk-circleci
   home_url: https://crashoverride.run

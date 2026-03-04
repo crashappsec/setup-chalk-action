@@ -1,6 +1,6 @@
-# chalk-teamcity
+# Chalk TeamCity Integration
 
-> **PoC:** Source lives in `chalk-teamcity/` on the `nettrino/expandbuildpipes`
+> **PoC:** Source lives in `teamcity/` on the `nettrino/expandbuildpipes`
 > branch of `crashappsec/setup-chalk-action`. No dedicated repo is required —
 > the meta-runner XML is uploaded directly to TeamCity via the UI.
 
@@ -17,7 +17,7 @@ TeamCity Meta-Runner and Kotlin DSL configuration for installing and configuring
 ```bash
 git clone --branch nettrino/expandbuildpipes \
   https://github.com/crashappsec/setup-chalk-action.git
-cd setup-chalk-action/chalk-teamcity
+cd setup-chalk-action/teamcity
 docker-compose up -d
 # Open http://localhost:8111
 # Complete setup wizard, choose Internal DB, create admin user

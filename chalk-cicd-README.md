@@ -9,13 +9,13 @@ No separate repos have been created yet.
 
 | Platform | Subdirectory | Branch path |
 |----------|-------------|-------------|
-| GitLab CI/CD | `chalk-gitlab-component/` | [`nettrino/expandbuildpipes/chalk-gitlab-component`](https://github.com/crashappsec/setup-chalk-action/tree/nettrino/expandbuildpipes/chalk-gitlab-component) |
-| Jenkins | `chalk-jenkins-library/` | [`nettrino/expandbuildpipes/chalk-jenkins-library`](https://github.com/crashappsec/setup-chalk-action/tree/nettrino/expandbuildpipes/chalk-jenkins-library) |
-| Buildkite | `chalk-buildkite-plugin/` | [`nettrino/expandbuildpipes/chalk-buildkite-plugin`](https://github.com/crashappsec/setup-chalk-action/tree/nettrino/expandbuildpipes/chalk-buildkite-plugin) |
-| CircleCI | `chalk-circleci-orb/` | [`nettrino/expandbuildpipes/chalk-circleci-orb`](https://github.com/crashappsec/setup-chalk-action/tree/nettrino/expandbuildpipes/chalk-circleci-orb) |
-| Azure DevOps | `chalk-azure-pipeline-template/` | [`nettrino/expandbuildpipes/chalk-azure-pipeline-template`](https://github.com/crashappsec/setup-chalk-action/tree/nettrino/expandbuildpipes/chalk-azure-pipeline-template) |
-| Bitbucket | `bitbucket-chalk-pipe/` | [`nettrino/expandbuildpipes/bitbucket-chalk-pipe`](https://github.com/crashappsec/setup-chalk-action/tree/nettrino/expandbuildpipes/bitbucket-chalk-pipe) |
-| TeamCity | `chalk-teamcity/` | [`nettrino/expandbuildpipes/chalk-teamcity`](https://github.com/crashappsec/setup-chalk-action/tree/nettrino/expandbuildpipes/chalk-teamcity) |
+| GitLab CI/CD | `gitlab/` | [`nettrino/expandbuildpipes/gitlab`](https://github.com/crashappsec/setup-chalk-action/tree/nettrino/expandbuildpipes/gitlab) |
+| Jenkins | `jenkins/` | [`nettrino/expandbuildpipes/jenkins`](https://github.com/crashappsec/setup-chalk-action/tree/nettrino/expandbuildpipes/jenkins) |
+| Buildkite | `buildkite/` | [`nettrino/expandbuildpipes/buildkite`](https://github.com/crashappsec/setup-chalk-action/tree/nettrino/expandbuildpipes/buildkite) |
+| CircleCI | `circleci/` | [`nettrino/expandbuildpipes/circleci`](https://github.com/crashappsec/setup-chalk-action/tree/nettrino/expandbuildpipes/circleci) |
+| Azure DevOps | `azure-devops/` | [`nettrino/expandbuildpipes/azure-devops`](https://github.com/crashappsec/setup-chalk-action/tree/nettrino/expandbuildpipes/azure-devops) |
+| Bitbucket | `bitbucket/` | [`nettrino/expandbuildpipes/bitbucket`](https://github.com/crashappsec/setup-chalk-action/tree/nettrino/expandbuildpipes/bitbucket) |
+| TeamCity | `teamcity/` | [`nettrino/expandbuildpipes/teamcity`](https://github.com/crashappsec/setup-chalk-action/tree/nettrino/expandbuildpipes/teamcity) |
 
 When each integration is validated, create a dedicated repo for it and update the
 references (see the **Production** note in each platform section below).
@@ -43,7 +43,7 @@ curl -fsSL https://raw.githubusercontent.com/crashappsec/setup-chalk-action/main
 
 ## 1. GitLab CI/CD
 
-**Source:** `chalk-gitlab-component/` on the `nettrino/expandbuildpipes` branch
+**Source:** `gitlab/` on the `nettrino/expandbuildpipes` branch
 
 Two tiers:
 - **Ultimate**: Pipeline Execution Policy — configure once, applies automatically to all group pipelines
@@ -53,11 +53,11 @@ Two tiers:
 
 1. **Create GitLab account** at gitlab.com (if not already done)
 2. **Create a policy project** in your group, e.g. `your-group/chalk-policy` (can be private)
-3. **Push the `chalk-gitlab-component/` subdirectory** as the policy project:
+3. **Push the `gitlab/` subdirectory** as the policy project:
    ```bash
    git clone --branch nettrino/expandbuildpipes \
      https://github.com/crashappsec/setup-chalk-action.git
-   cd setup-chalk-action/chalk-gitlab-component
+   cd setup-chalk-action/gitlab
    git init && git add . && git commit -m "initial"
    git remote add origin git@gitlab.com:your-group/chalk-policy.git
    git push -u origin main
@@ -75,18 +75,18 @@ Every pipeline in the group now gets chalk automatically.
 
 ### Free / Premium: Per-Repository
 
-Copy `chalk-gitlab-component/examples/per-repo.yml` into your repository's
+Copy `gitlab/examples/per-repo.yml` into your repository's
 `.gitlab-ci.yml` (or merge the `before_script`/`after_script` blocks into your
 existing build job), then set `CHALK_POST_URL` as a project-level CI/CD variable.
 
 > **Production:** Create a dedicated GitLab project `chalk-security-policy` (or similar)
-> and push `chalk-gitlab-component/` there. Update the policy `project:` reference.
+> and push `gitlab/` there. Update the policy `project:` reference.
 
 ---
 
 ## 2. Jenkins Shared Library
 
-**Source:** `chalk-jenkins-library/` on the `nettrino/expandbuildpipes` branch
+**Source:** `jenkins/` on the `nettrino/expandbuildpipes` branch
 
 Jenkins supports pointing a shared library directly at a subdirectory of an existing
 repo — no separate repo needed for PoC.
@@ -100,25 +100,25 @@ repo — no separate repo needed for PoC.
    ```
 2. **Complete setup wizard** at http://localhost:8080
 3. **Register the shared library** (Manage Jenkins → Configure System → Global Pipeline Libraries):
-   - Name: `chalk-jenkins-library`
+   - Name: `chalk-jenkins`
    - Default version: `nettrino/expandbuildpipes`
    - SCM: Git
    - URL: `https://github.com/crashappsec/setup-chalk-action`
-   - Library Path: `chalk-jenkins-library/`
+   - Library Path: `jenkins/`
 4. **Add credential:**
    - Manage Jenkins → Manage Credentials → System → Global
    - Kind: Secret text, ID: `chalk-api-token`, Secret: your Chalk token
 5. **Create Pipeline job** using the example from
-   `chalk-jenkins-library/examples/Jenkinsfile`
+   `jenkins/examples/Jenkinsfile`
 
-> **Production:** Create a dedicated repo `chalk-jenkins-library`, push the subdirectory
+> **Production:** Create a dedicated repo `chalk-jenkins`, push the subdirectory
 > contents there, and update the library URL and default version to `main`.
 
 ---
 
 ## 3. Buildkite Plugin
 
-**Source:** `chalk-buildkite-plugin/` on the `nettrino/expandbuildpipes` branch
+**Source:** `buildkite/` on the `nettrino/expandbuildpipes` branch
 
 > **Note:** Buildkite requires the plugin to be in its own public GitHub repository
 > named `<org>/<name>-buildkite-plugin`. The subdirectory approach works for local
@@ -130,7 +130,7 @@ repo — no separate repo needed for PoC.
 ```bash
 git clone --branch nettrino/expandbuildpipes \
   https://github.com/crashappsec/setup-chalk-action.git
-cd setup-chalk-action/chalk-buildkite-plugin
+cd setup-chalk-action/buildkite
 
 # Install bats-core
 brew install bats-core   # macOS
@@ -147,13 +147,13 @@ bats tests/
    until `crashappsec/chalk-buildkite-plugin` is created as a dedicated repo
 
 > **Production:** Create a dedicated public repo `crashappsec/chalk-buildkite-plugin`,
-> push `chalk-buildkite-plugin/` there, and tag `v1.0.0`.
+> push `buildkite/` there, and tag `v1.0.0`.
 
 ---
 
 ## 4. CircleCI Orb
 
-**Source:** `chalk-circleci-orb/` on the `nettrino/expandbuildpipes` branch
+**Source:** `circleci/` on the `nettrino/expandbuildpipes` branch
 
 The orb source can be packed and published from the subdirectory directly — no
 separate GitHub repo needed to publish to the CircleCI Orb Registry.
@@ -177,7 +177,7 @@ separate GitHub repo needed to publish to the CircleCI Orb Registry.
    ```bash
    git clone --branch nettrino/expandbuildpipes \
      https://github.com/crashappsec/setup-chalk-action.git
-   cd setup-chalk-action/chalk-circleci-orb
+   cd setup-chalk-action/circleci
 
    circleci orb pack src/ > /tmp/chalk-orb.yml
    circleci orb validate /tmp/chalk-orb.yml
@@ -189,14 +189,14 @@ separate GitHub repo needed to publish to the CircleCI Orb Registry.
    ```
 8. **Add `CHALK_TOKEN`** to CircleCI project environment variables
 
-> **Production:** Create a dedicated repo `chalk-circleci-orb`, push the subdirectory
+> **Production:** Create a dedicated repo `chalk-circleci`, push the subdirectory
 > contents there, and enable CI/CD for automated publishing.
 
 ---
 
 ## 5. Azure DevOps Pipeline Template
 
-**Source:** `chalk-azure-pipeline-template/` on the `nettrino/expandbuildpipes` branch
+**Source:** `azure-devops/` on the `nettrino/expandbuildpipes` branch
 
 Azure DevOps can reference templates from a GitHub repository directly via a
 [GitHub service connection](https://learn.microsoft.com/en-us/azure/devops/pipelines/library/service-endpoints?view=azure-devops#github-service-connection)
@@ -222,7 +222,7 @@ Azure DevOps can reference templates from a GitHub repository directly via a
      - group: chalk-secrets
 
    steps:
-     - template: chalk-azure-pipeline-template/templates/install-chalk.yml@chalk-templates
+     - template: azure-devops/templates/install-chalk.yml@chalk-templates
        parameters:
          version: '0.6.5'
          connect: true
@@ -230,14 +230,14 @@ Azure DevOps can reference templates from a GitHub repository directly via a
 5. **Run the pipeline** to validate
 
 > **Production:** Create a dedicated Azure DevOps project `chalk-pipeline-templates`,
-> push `chalk-azure-pipeline-template/` there, and update the `resources.repositories`
+> push `azure-devops/` there, and update the `resources.repositories`
 > block to use `type: git` pointing at the Azure Repos project.
 
 ---
 
 ## 6. Bitbucket Pipe
 
-**Source:** `bitbucket-chalk-pipe/` on the `nettrino/expandbuildpipes` branch
+**Source:** `bitbucket/` on the `nettrino/expandbuildpipes` branch
 
 The Docker image (`crashappsec/bitbucket-chalk-pipe`) has not been published yet.
 Use the direct-script approach for PoC — it works without the Docker image and
@@ -245,7 +245,7 @@ references `setup.sh` directly.
 
 ### Direct-script PoC (recommended until image is published)
 
-Copy `bitbucket-chalk-pipe/examples/consumer-script.yml` as your
+Copy `bitbucket/examples/consumer-script.yml` as your
 `bitbucket-pipelines.yml`. It uses `setup.sh` from this repo directly, with no
 Docker image required.
 
@@ -257,7 +257,7 @@ Docker image required.
    ```bash
    git clone --branch nettrino/expandbuildpipes \
      https://github.com/crashappsec/setup-chalk-action.git
-   cd setup-chalk-action/bitbucket-chalk-pipe
+   cd setup-chalk-action/bitbucket
    git init && git add . && git commit -m "initial"
    git remote add origin git@bitbucket.org:<your-workspace>/bitbucket-chalk-pipe.git
    git push -u origin main
@@ -266,7 +266,7 @@ Docker image required.
    - `CHALK_TOKEN`, `DOCKER_HUB_USERNAME`, `DOCKER_HUB_PASSWORD`
 5. **Build and push the image manually:**
    ```bash
-   cd bitbucket-chalk-pipe
+   cd bitbucket
    docker build -t crashappsec/bitbucket-chalk-pipe:1.0.0 .
    docker push crashappsec/bitbucket-chalk-pipe:1.0.0
    docker tag crashappsec/bitbucket-chalk-pipe:1.0.0 crashappsec/bitbucket-chalk-pipe:latest
@@ -280,7 +280,7 @@ Docker image required.
 
 ## 7. TeamCity Meta-Runner
 
-**Source:** `chalk-teamcity/` on the `nettrino/expandbuildpipes` branch
+**Source:** `teamcity/` on the `nettrino/expandbuildpipes` branch
 
 TeamCity meta-runners are uploaded as XML files — no separate repo needed.
 
@@ -288,7 +288,7 @@ TeamCity meta-runners are uploaded as XML files — no separate repo needed.
    ```bash
    git clone --branch nettrino/expandbuildpipes \
      https://github.com/crashappsec/setup-chalk-action.git
-   cd setup-chalk-action/chalk-teamcity
+   cd setup-chalk-action/teamcity
    docker-compose up -d
    ```
 2. **Open** http://localhost:8111 and complete setup wizard

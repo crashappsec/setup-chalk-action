@@ -1,4 +1,4 @@
-# chalk-azure-pipeline-template
+# Chalk Azure DevOps Pipeline Templates
 
 Azure DevOps YAML Pipeline Templates for installing and configuring [Chalk](https://crashoverride.run) in your Azure Pipelines.
 
@@ -23,7 +23,7 @@ variables:
   - group: chalk-secrets    # Variable group containing CHALK_TOKEN
 
 steps:
-  - template: chalk-azure-pipeline-template/templates/install-chalk.yml@chalk-templates
+  - template: azure-devops/templates/install-chalk.yml@chalk-templates
     parameters:
       version: '0.6.5'
       connect: true
@@ -34,7 +34,7 @@ steps:
 
 ```yaml
 extends:
-  template: chalk-azure-pipeline-template/templates/chalk-job.yml@chalk-templates
+  template: azure-devops/templates/chalk-job.yml@chalk-templates
   parameters:
     chalkVersion: '0.6.5'
     chalkConnect: true
@@ -70,5 +70,5 @@ extends:
 1. Create Azure DevOps project `chalk-pipeline-templates`
 2. Push this directory's contents to it
 3. Update `resources.repositories` to use `type: git, name: MyOrg/chalk-pipeline-templates`
-4. Remove the `endpoint:` line and update template paths to remove the `chalk-azure-pipeline-template/` prefix
+4. Remove the `endpoint:` line and update template paths to remove the subdirectory prefix
 5. Tag a release: `v1.0.0`

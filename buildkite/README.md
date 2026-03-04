@@ -1,10 +1,10 @@
-# chalk-buildkite-plugin
+# Chalk Buildkite Plugin
 
 A [Buildkite Plugin](https://buildkite.com/docs/plugins) for installing and configuring
 [Chalk](https://crashoverride.run) in your Buildkite pipelines. Chalk wraps build
 commands (e.g. `docker build`) to capture metadata and chalk-mark artifacts automatically.
 
-> **PoC status:** Source lives in `chalk-buildkite-plugin/` on the
+> **PoC status:** Source lives in `buildkite/` on the
 > `nettrino/expandbuildpipes` branch of `crashappsec/setup-chalk-action`.
 > Buildkite requires a dedicated public repo named
 > `crashappsec/chalk-buildkite-plugin` before pipelines can reference the plugin as
@@ -82,13 +82,13 @@ steps:
   - label: ":docker: Build with Chalk"
     command: "docker build -t myapp:${BUILDKITE_BUILD_NUMBER} ."
     plugins:
-      - ./chalk-buildkite-plugin:
+      - ./buildkite:
           version: "0.6.5"
 ```
 
 This works because:
 
-1. The Buildkite agent checks out the repo (including `chalk-buildkite-plugin/`).
+1. The Buildkite agent checks out the repo (including `buildkite/`).
 2. Buildkite sees the `./` prefix and loads the plugin from the checkout directory.
 3. The `hooks/environment` and `hooks/pre-command` scripts run exactly as they would
    with a published plugin.
@@ -218,7 +218,7 @@ steps:
   - label: ":docker: Build with Chalk"
     command: "docker build -f .buildkite/Dockerfile.test -t chalk-test:${BUILDKITE_BUILD_NUMBER} ."
     plugins:
-      - ./chalk-buildkite-plugin:
+      - ./buildkite:
           version: "0.6.5"
 ```
 
@@ -244,7 +244,7 @@ sudo apt-get install bats # Ubuntu/Debian
 # Clone and run tests
 git clone --branch nettrino/expandbuildpipes \
   https://github.com/crashappsec/setup-chalk-action.git
-cd setup-chalk-action/chalk-buildkite-plugin
+cd setup-chalk-action/buildkite
 bats tests/
 ```
 
@@ -265,9 +265,9 @@ When the plugin graduates from PoC to production:
 
 1. Create a **public** GitHub repository: `crashappsec/chalk-buildkite-plugin`
    (Buildkite requires the `-buildkite-plugin` suffix).
-2. Push the contents of `chalk-buildkite-plugin/` to the new repo:
+2. Push the contents of `buildkite/` to the new repo:
    ```bash
-   cd chalk-buildkite-plugin
+   cd buildkite
    git init && git add . && git commit -m "initial release"
    git remote add origin git@github.com:crashappsec/chalk-buildkite-plugin.git
    git push -u origin main
@@ -277,7 +277,7 @@ When the plugin graduates from PoC to production:
    ```yaml
    # Before (vendored / PoC)
    plugins:
-     - ./chalk-buildkite-plugin:
+     - ./buildkite:
          version: "0.6.5"
 
    # After (published)
@@ -394,14 +394,14 @@ steps:
 - Make sure the pipeline YAML uses the `./` prefix:
   ```yaml
   plugins:
-    - ./chalk-buildkite-plugin:   # correct
+    - ./buildkite:   # correct
   ```
   not:
   ```yaml
   plugins:
-    - chalk-buildkite-plugin:     # wrong — Buildkite will try GitHub
+    - buildkite:                   # wrong — Buildkite will try GitHub
   ```
-- Confirm the `chalk-buildkite-plugin/` directory is committed and pushed
+- Confirm the `buildkite/` directory is committed and pushed
   to the branch the pipeline is building.
 
 ### `CHALK_TOKEN` not available

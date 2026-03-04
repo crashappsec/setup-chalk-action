@@ -1,6 +1,6 @@
-# bitbucket-chalk-pipe
+# Chalk Bitbucket Pipe
 
-> **PoC:** Source lives in `bitbucket-chalk-pipe/` on the `nettrino/expandbuildpipes`
+> **PoC:** Source lives in `bitbucket/` on the `nettrino/expandbuildpipes`
 > branch of `crashappsec/setup-chalk-action`. The Docker image
 > `crashappsec/bitbucket-chalk-pipe` has not been published yet. Use **Option B**
 > (direct script) below until the image is built and pushed.
@@ -68,7 +68,7 @@ Copy `examples/consumer-script.yml` as your `bitbucket-pipelines.yml`. It fetche
    ```bash
    git clone --branch nettrino/expandbuildpipes \
      https://github.com/crashappsec/setup-chalk-action.git
-   cd setup-chalk-action/bitbucket-chalk-pipe
+   cd setup-chalk-action/bitbucket
    git init && git add . && git commit -m "initial"
    git remote add origin git@bitbucket.org:<your-workspace>/bitbucket-chalk-pipe.git
    git push -u origin main

@@ -1,6 +1,6 @@
-# chalk-circleci-orb
+# Chalk CircleCI Orb
 
-> **PoC:** Source lives in `chalk-circleci-orb/` on the `nettrino/expandbuildpipes`
+> **PoC:** Source lives in `circleci/` on the `nettrino/expandbuildpipes`
 > branch of `crashappsec/setup-chalk-action`. Pack and publish from that subdirectory
 > directly — no separate GitHub repo needed to publish to the orb registry.
 
@@ -65,7 +65,7 @@ circleci orb create crashappsec/chalk
 # Clone branch and publish from subdirectory
 git clone --branch nettrino/expandbuildpipes \
   https://github.com/crashappsec/setup-chalk-action.git
-cd setup-chalk-action/chalk-circleci-orb
+cd setup-chalk-action/circleci
 
 circleci orb pack src/ > /tmp/chalk-orb.yml
 circleci orb validate /tmp/chalk-orb.yml

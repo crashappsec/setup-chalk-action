@@ -1,4 +1,4 @@
-# chalk-gitlab-component
+# gitlab
 
 GitLab CI/CD integration for [Chalk](https://crashoverride.run). Instruments Docker
 builds to produce 3 JSON reports — **build**, **push**, and **env** — with the same
@@ -28,12 +28,12 @@ Both approaches use the same pattern:
 ### Step 1: Create the policy project
 
 Create a project in your group to hold the Chalk CI configuration, e.g. `your-group/chalk-policy`.
-Clone the `nettrino/expandbuildpipes` branch and push the `chalk-gitlab-component/` subdirectory:
+Clone the `nettrino/expandbuildpipes` branch and push the `gitlab/` subdirectory:
 
 ```bash
 git clone --branch nettrino/expandbuildpipes \
   https://github.com/crashappsec/setup-chalk-action.git
-cd setup-chalk-action/chalk-gitlab-component
+cd setup-chalk-action/gitlab
 git init && git add . && git commit -m "initial"
 git remote add origin git@gitlab.com:your-group/chalk-policy.git
 git push -u origin main
@@ -145,7 +145,7 @@ Produced by `chalk env` in `after_script`. Completion signal confirming chalk ra
 ## Repository Structure
 
 ```
-chalk-gitlab-component/
+gitlab/
 ├── chalk-setup.yml                       # Injected CI config (Ultimate: via policy)
 ├── .gitlab/
 │   └── security-policies/

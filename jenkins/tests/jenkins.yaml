@@ -17,7 +17,7 @@ security:
 unclassified:
   globalLibraries:
     libraries:
-      - name: "chalk-jenkins-library"
+      - name: "chalk-jenkins"
         defaultVersion: "main"
         implicit: false
         allowVersionOverride: true
@@ -33,7 +33,7 @@ jobs:
         definition {
           cps {
             script('''
-              @Library('chalk-jenkins-library') _
+              @Library('chalk-jenkins') _
 
               pipeline {
                 agent any

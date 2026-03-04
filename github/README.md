@@ -1,19 +1,9 @@
-# Setup Chalk
+# GitHub Action — Setup Chalk
 
-GitHub Action for setting up [Chalk].
+GitHub Action for installing and configuring [Chalk](https://crashoverride.run) in your GitHub workflows.
 
-Chalk captures metadata at build time, and adds a small 'chalk mark' (metadata)
-to any artifacts, so they can be identified in production. This GitHub action
-simplifies the process of deploying `chalk` for GitHub action users. The
-action:
-
-- Installs `chalk` CLI in the GitHub runner (hosted and
-  self-hosted). You can then start using `chalk` in your GitHub workflows.
-- Wraps `docker` with `chalk`. As such, any GitHub workflows using `docker`
-  will automatically start using `chalk` when building any Docker images.
-- Allows to `load` `chalk` configuration from a file or an URL. For
-  example this can configure `chalk` to send metadata reports to an
-  external server for metadata collection.
+> **Note:** `action.yml` and `setup.sh` live at the repository root for backwards
+> compatibility (`uses: crashappsec/setup-chalk-action@main`).
 
 ## Usage
 
@@ -33,9 +23,7 @@ jobs:
         uses: crashappsec/setup-chalk-action@main
 ```
 
-## Customizing
-
-The following parameters can be provided to the action.
+## Inputs
 
 | Name                 | Type    | Default   | Description                                                                                                                                                                                                       |
 | -------------------- | ------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -50,7 +38,7 @@ The following parameters can be provided to the action.
 | `public_key`         | String  |           | Content of chalk signing public key). Copy from `chalk.pub` after `chalk setup`.                                                                                                                                  |
 | `private_key`        | String  |           | Content of chalk signing encrypted private key (with the provided password). Copy from `chalk.key` after `chalk setup`.                                                                                           |
 
-For example:
+## Example
 
 ```yaml
 - name: Set up Chalk
@@ -66,29 +54,14 @@ For example:
     private_key: ${{ secrets.CHALK_PRIVATE_KEY }}
 ```
 
+## How It Works
+
+The action:
+
+- Installs the `chalk` CLI in the GitHub runner (hosted and self-hosted).
+- Wraps `docker` with `chalk` so any Docker builds automatically capture metadata.
+- Allows loading `chalk` configuration from a file or URL.
+
 [chalk]: https://github.com/crashappsec/chalk/
 [releases]: https://crashoverride.com/releases
 [CrashOverride]: https://crashoverride.run
-
-## CI/CD Integrations
-
-Chalk integrates with all major CI/CD platforms. Each integration lives in its own subdirectory with dedicated documentation:
-
-| Platform | Directory | Documentation |
-|----------|-----------|---------------|
-| GitHub Actions | `github/` | [README](github/README.md) |
-| GitLab CI/CD | `gitlab/` | [README](gitlab/README.md) |
-| Jenkins | `jenkins/` | [README](jenkins/README.md) |
-| Buildkite | `buildkite/` | [README](buildkite/README.md) |
-| CircleCI | `circleci/` | [README](circleci/README.md) |
-| Azure DevOps | `azure-devops/` | [README](azure-devops/README.md) |
-| Bitbucket | `bitbucket/` | [README](bitbucket/README.md) |
-| TeamCity | `teamcity/` | [README](teamcity/README.md) |
-
-For a comprehensive setup guide covering all platforms, see [chalk-cicd-README.md](chalk-cicd-README.md).
-
-## Contributing
-
-We welcome contributions but do require you to complete a contributor
-license agreement or CLA. You can read the CLA and about our process
-[here](https://github.com/crashappsec/.github/blob/main/CLA-process.md).
