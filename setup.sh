@@ -242,6 +242,9 @@ public_key=${CHALK_PUBLIC_KEY:-}
 private_key=${CHALK_PRIVATE_KEY:-}
 # run chalk setup
 setup=${CHALK_SETUP:-}
+# whether to configure chalk to upload reports to the MCP server
+chalkmcp=${CHALK_CHALKMCP:-}
+CHALKMCP_HOST=${CHALK_CHALKMCP_HOST:-https://chalkmcp.crashoverride.run}
 
 do_help=
 chalk_path=
@@ -585,6 +588,33 @@ load_custom_profile() {
     fi
 }
 
+configure_chalkmcp() {
+    if [ -z "${CHALK_MCP_TOKEN:-}" ]; then
+        warn CHALK_MCP_TOKEN not set. Skipping MCP server configuration.
+        warn Set CHALK_MCP_TOKEN as a CI secret to enable report uploads.
+        warn Get your token by running chalk_setup_cicd in hosted mode.
+        return
+    fi
+    info Configuring chalk to upload reports to Chalk MCP server at "$CHALKMCP_HOST"
+    config=$(mktemp chalk_mcp_XXXXXX).c4m
+    cat > "$config" << EOF
+auth_config chalkmcp {
+    auth:  "jwt"
+    token: "$CHALK_MCP_TOKEN"
+}
+
+sink_config chalkmcp_reports {
+    sink:     "presign"
+    uri:      "$CHALKMCP_HOST/v1/chalk/presign"
+    auth:     "chalkmcp"
+}
+
+subscribe("report", "chalkmcp_reports")
+EOF
+    chalk load "$config"
+    info Chalk MCP server report uploads configured
+}
+
 # wrapper for calling chalk within the script
 chalk() {
     $SUDO chmod +xr "$chalk_path"
@@ -850,6 +880,10 @@ Args:
 --latest-version-url=* URL to get latest chalk version if
                        --version is not provided.
                        Default is '${latest_version_url}'.
+--chalkmcp             Configure chalk to upload reports to the
+                       Chalk MCP server. Requires CHALK_MCP_TOKEN
+                       environment variable to be set.
+                       Get your token via chalk_setup_cicd in hosted mode.
 --copy-from=*          Instead of downloading Chalk binary
                        copy it from this path instead.
 EOF
@@ -955,6 +989,9 @@ while [ "$n" -gt 0 ]; do
         --setup)
             setup=true
             ;;
+        --chalkmcp)
+            chalkmcp=true
+            ;;
         --overwrite)
             overwrite=true
             ;;
@@ -1052,6 +1089,10 @@ fi
 
 if [ -n "$token" ]; then
     load_custom_profile
+fi
+
+if [ -n "$chalkmcp" ]; then
+    configure_chalkmcp
 fi
 
 for i in $(echo "$load" | tr "," "\n" | tr " " "\n"); do

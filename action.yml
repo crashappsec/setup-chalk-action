@@ -39,6 +39,13 @@ inputs:
       CrashOverride API Token.
       It is automatically fetched via OpenID connect if not provided when `connect=true`.
     required: false
+  chalkmcp:
+    description: |
+      Configure chalk to upload reports to the Chalk MCP server.
+      Requires CHALK_MCP_TOKEN secret to be set in the environment.
+      Get your token by running chalk_setup_cicd in hosted mode.
+    required: false
+    default: "false"
   password:
     description: |
       Password for chalk signing key.
@@ -170,6 +177,7 @@ runs:
           --token='${{ inputs.token }}' \
           --profile='${{ inputs.profile }}' \
           ${{ inputs.connect == 'true' && '--connect' || '' }} \
+          ${{ inputs.chalkmcp == 'true' && '--chalkmcp' || '' }} \
           ${{ inputs.public_key != '' && format('--public-key={0}/chalk.pub', env.CHALK_TMP) || '' }} \
           ${{ inputs.private_key != '' && format('--private-key={0}/chalk.key', env.CHALK_TMP) || '' }} \
           ${{ runner.debug == '1' && '--debug' || '' }}
