@@ -825,7 +825,7 @@ Args:
                        Default is '${prefix}'.
 --chalk-path=*         Exact path where to install Chalk.
                        Default is '$(get_chalk_path)'.
---no-wrap=*            Do not wrap supported binaries.
+--no-wrap              Do not wrap supported binaries.
 --debug/-vv            Enable debug mode. This enables trace
                        logs for installed Chalk and will
                        run setup script in verbose mode.
