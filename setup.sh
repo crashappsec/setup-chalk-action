@@ -163,7 +163,7 @@ can_rwx() {
     return 1
 }
 
-URL_PREFIX=${CHALK_DOWNLOAD_URL:-https://dl.crashoverride.run}
+URL_PREFIX=https://dl.crashoverride.run
 SHA256=sha256sum
 SUDO=sudo
 
@@ -251,7 +251,7 @@ ENTITLEMENTS_HOST=${CHALK_ENTITLEMENTS_URL:-https://entitlements.crashoverride.r
 CHALKAPI_HOST=
 if [ -n "${__CHALK_TESTING__:-}" ]; then
     warn Beware - chalk is now using test environment which is meant for internal chalk testing only.
-    ENTITLEMENTS_HOST=${CHALK_ENTITLEMENTS_URL:-https://entitlements.test.crashoverride.run}
+    ENTITLEMENTS_HOST=https://entitlements.test.crashoverride.run
 fi
 
 retry() {
