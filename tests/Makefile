@@ -8,6 +8,9 @@ endif
 ifneq "$(COPY)" ""
 ARGS+=--copy-from=/chalk/chalk
 endif
+ifneq "$(REPLACE)" ""
+ARGS+=--config-replace=/chalk/chalk
+endif
 ifneq "$(CHALK_PASSWORD)" ""
 ARGS+=--public-key=tests/chalk.pub
 ARGS+=--private-key=tests/chalk.key
