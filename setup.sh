@@ -221,6 +221,8 @@ oidc=${CHALK_OIDC:-}
 prefix=${CHALK_PREFIX:-$(default_prefix)}
 # whether to overwrite existing chalk binary
 overwrite=${CHALK_OVERWRITE:-true}
+# whether to replace chalk configuration
+config_replace=${CHALK_CONFIG_REPLACE:-}
 # whether to wrap external commands with chalk
 wrap=${CHALK_WRAP:-true}
 # chalk commands log level
@@ -687,13 +689,16 @@ install_chalk() {
 
 # load custom Chalk config
 load_config() {
-    to_load=$1
+    if [ -n "$config_replace" ]; then
+        set -- "$@" "--replace"
+        config_replace=
+    fi
     if [ "$params" = "-" ]; then
-        retry chalk load "$to_load" --params
+        retry chalk load "$@" --params
     elif [ -n "$params" ]; then
-        echo "$params" | stdin_pipe=true retry chalk load "$to_load" --params
+        echo "$params" | stdin_pipe=true retry chalk load "$@" --params
     else
-        retry chalk load "$to_load"
+        retry chalk load "$@"
     fi
     if [ -n "$debug" ]; then
         chalk dump
@@ -832,6 +837,9 @@ Args:
 --[no-]overwrite       Whether to overwrite Chalk binary
                        if '$(get_chalk_path)' already exists.
                        Default is '${overwrite}'.
+--[no]-config-replace  When loading configurations into chalk,
+                       pass '--replace' which will replace existing configurations.
+                       Default is '${config_replace}'.
 --timeout=*            Timeout for Chalk commands (in seconds).
                        Default is '${timeout}.
 --attempts=*           How many times in total retry retryable commands.
@@ -960,6 +968,12 @@ while [ "$n" -gt 0 ]; do
             ;;
         --no-overwrite)
             overwrite=
+            ;;
+        --config-replace)
+            config_replace=true
+            ;;
+        --no-config_replace)
+            config_replace=
             ;;
         --copy-from)
             copy_from=$1
