@@ -163,7 +163,7 @@ can_rwx() {
     return 1
 }
 
-URL_PREFIX=https://dl.crashoverride.run
+URL_PREFIX=${CHALK_DOWNLOAD_URL:-https://dl.crashoverride.run}
 SHA256=sha256sum
 SUDO=sudo
 
