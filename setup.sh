@@ -694,7 +694,7 @@ load_config() {
         config_replace=
     fi
     if [ "$params" = "-" ]; then
-        retry chalk load "$@" --params
+        stdin_pipe=true retry chalk load "$@" --params
     elif [ -n "$params" ]; then
         echo "$params" | stdin_pipe=true retry chalk load "$@" --params
     else
