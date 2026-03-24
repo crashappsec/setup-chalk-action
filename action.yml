@@ -108,16 +108,6 @@ runs:
       run: |
         echo "::add-mask::${{ inputs.password }}"
 
-    # https://docs.sigstore.dev/system_config/installation/
-    - name: Install cosign
-      if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS')
-      uses: sigstore/cosign-installer@f14800521ef377428f8fdd1f9ccc6b2f900212ad
-      # most likely bash is missing
-      # https://github.com/sigstore/cosign-installer/issues/190
-      continue-on-error: true
-      with:
-        cosign-release: v2.2.3
-
     - name: Set CHALK_PASSWORD
       if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && inputs.password != ''
       shell: sh
