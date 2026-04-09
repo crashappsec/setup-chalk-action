@@ -949,7 +949,7 @@ while [ "$n" -gt 0 ]; do
             prefix=$(realpath "$prefix")
             ;;
         --chalk-path)
-            chalk_path=$1
+            chalk_path=$(realpath "$1")
             ;;
         --no-wrap)
             wrap=
