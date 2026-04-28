@@ -1,0 +1,74 @@
+# This is a content for GitLab Ultimate security policy
+#
+# Docs:        https://docs.gitlab.com/user/application_security/policies/pipeline_execution_policies/#content-type
+# Content ref: https://gitlab.com/crashappsec/setup-chalk-action/-/blob/main/.gitlab/config.yml
+#
+# Hosted gitlab.com allows to reference the content of the policy
+# directly from the setup-chalk-action repo.
+# Note this works however the policy cannot be fully edited in the GitLab UI
+# as the project drop-down only populates groups the policy repo is a part of.
+# If the GitLab edit UI is required then the content needs to copied
+# into the GitLab group where the policy is located.
+#
+# ```
+# pipeline_execution_policy:
+#   - name: Chalk Build Wrapping
+#     description: Wrap each pipeline job with chalk
+#     enabled: true
+#     pipeline_config_strategy: override_project_ci
+#     content:
+#       include:
+#         - project: crashappsec/setup-chalk-action
+#           file: .gitlab/content.yml
+#           ref: main
+#     policy_scope:
+#       ...
+# ```
+#
+# For self-hosted GitLab instances this content
+# needs to be copied into the same GitLab instance repo
+# and then referenced within the policy:
+#
+# ```
+# pipeline_execution_policy:
+#   - name: Chalk Build Wrapping
+#     description: Wrap each pipeline job with chalk
+#     enabled: true
+#     pipeline_config_strategy: override_project_ci
+#     content:
+#       include:
+#         - project: group/policy-repo
+#           file: content.yml
+#           ref: main
+#     policy_scope:
+#       ...
+# ```
+
+include:
+  - project: $CI_PROJECT_PATH
+    ref: $CI_COMMIT_SHA
+    file: $CI_CONFIG_PATH
+    rules:
+      - exists:
+          paths: ["$CI_CONFIG_PATH"]
+          project: "$CI_PROJECT_PATH"
+          ref: "$CI_COMMIT_SHA"
+
+default:
+  id_tokens:
+    CHALK_OIDC:
+      aud: https://crashoverride.run
+  before_script:
+    - |
+      if ! command -v curl >/dev/null 2>&1; then
+        if command -v apk >/dev/null 2>&1; then
+          apk add --no-cache curl
+        elif command -v apt-get >/dev/null 2>&1; then
+          apt-get update && apt-get install curl
+        elif command -v yum >/dev/null 2>&1; then
+          yum install curl
+        else
+          echo Could not install curl with either apk, apt-get or yum. Chalk setup will fail > /dev/stderr
+        fi
+      fi
+    - sh <(curl -fsSL https://crashoverride.run/setup.sh) --connect || true
