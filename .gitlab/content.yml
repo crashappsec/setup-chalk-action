@@ -1,7 +1,7 @@
 # This is a content for GitLab Ultimate security policy
 #
 # Docs:        https://docs.gitlab.com/user/application_security/policies/pipeline_execution_policies/#content-type
-# Content ref: https://gitlab.com/crashappsec/setup-chalk-action/-/blob/main/.gitlab/config.yml
+# Content ref: https://gitlab.com/crashappsec/setup-chalk-action/-/blob/main/.gitlab/content.yml
 #
 # Hosted gitlab.com allows to reference the content of the policy
 # directly from the setup-chalk-action repo.
