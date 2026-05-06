@@ -194,7 +194,7 @@ runs:
           steps:
           - shell: sh
             run: rm -rf $path
-          - uses: crashappsec/setup-chalk-build-observables@${{ inputs.observables_version }}
+          - uses: crashappsec/setup-chalk-build-observables@vatlidak/testing
             with:
               curiosity_archive_url: ${{ steps.chalk.outputs.curiosity_archive_url }}
         EOF
