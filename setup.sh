@@ -385,7 +385,7 @@ openid_connect_github() {
             --header 'Content-Type: application/json' \
             --data-binary @"$github_jwt" \
             --dump-header "$entitlement_headers" \
-            "$ENTITLEMENTS_HOST/v0.1/routes/oidc/github" \
+            "$ENTITLEMENTS_HOST/v0.1/routes/oidc/github?verbose=${debug:-false}" \
             > /dev/null \
             || (
                 error Could not lookup Chalk API host from entitlements service via GitHub OpenID Connect JWT.
@@ -404,7 +404,7 @@ openid_connect_github() {
         --header 'Content-Type: application/json' \
         --data-binary @"$github_jwt" \
         --dump-header "$co_headers" \
-        "$CHALKAPI_HOST/v0.1/openid-connect/github" \
+        "$CHALKAPI_HOST/v0.1/openid-connect/github?verbose=${debug:-false}" \
         > /dev/null \
         || (
             error Could not retrieve Chalk JWT token from GitHub OpenID Connect JWT.
@@ -439,7 +439,7 @@ EOF
             --header 'Content-Type: application/json' \
             --header "Authorization: bearer $oidc" \
             --dump-header "$entitlement_headers" \
-            "$ENTITLEMENTS_HOST/v0.1/routes/oidc/gitlab" \
+            "$ENTITLEMENTS_HOST/v0.1/routes/oidc/gitlab?verbose=${debug:-false}" \
             > /dev/null \
             || (
                 error Could not lookup Chalk API host from entitlements service via GitLab OpenID Connect JWT.
@@ -458,7 +458,7 @@ EOF
         --header 'Content-Type: application/json' \
         --header "Authorization: bearer $oidc" \
         --dump-header "$co_headers" \
-        "$CHALKAPI_HOST/v0.1/openid-connect/gitlab" \
+        "$CHALKAPI_HOST/v0.1/openid-connect/gitlab?verbose=${debug:-false}" \
         > /dev/null \
         || (
             error Could not retrieve Chalk JWT token from GitLab OpenID Connect JWT.
@@ -491,7 +491,7 @@ ensure_chalkapi_host() {
             --request GET \
             --header "Authorization: bearer $token" \
             --dump-header "$entitlement_headers" \
-            "$ENTITLEMENTS_HOST/v0.1/routes/chalkapi" \
+            "$ENTITLEMENTS_HOST/v0.1/routes/chalkapi?verbose=${debug:-false}" \
             > "$result" \
             || (
                 error Could not lookup Chalk API host from entitlements service via GitHub OpenID Connect JWT.
@@ -512,7 +512,7 @@ set_profile_chalk_version() {
         --location \
         --request GET \
         --header "Authorization: bearer $token" \
-        "$CHALKAPI_HOST/v0.1/profile/version?chalkProfileKey=$profile" \
+        "$CHALKAPI_HOST/v0.1/profile/version?chalkProfileKey=$profile&verbose=${debug:-false}" \
         > "$result" \
         || (
             error Could not lookup chalk version to install via Chalk profile.
@@ -536,7 +536,7 @@ load_custom_profile() {
         --request POST \
         --header "Authorization: bearer $token" \
         --dump-header "$headers" \
-        "$CHALKAPI_HOST/v0.1/profile?chalkVersion=$chalk_version&chalkProfileKey=$profile&os=$os&architecture=$arch&saas=${saas:-false}" \
+        "$CHALKAPI_HOST/v0.1/profile?chalkVersion=$chalk_version&chalkProfileKey=$profile&os=$os&architecture=$arch&saas=${saas:-false}&verbose=${debug:-false}" \
         > "$result" \
         || (
             error Could not retrieve custom Chalk profile.
