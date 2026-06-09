@@ -561,7 +561,7 @@ load_custom_profile() {
     run_setup=$(header_value "$headers" x-chalk-setup)
     build_observables=$(header_value "$headers" x-chalk-build-observables)
     curiosity_archive=$(header_value "$headers" x-chalk-curiosity-archive)
-    curiosity_home=$(header_value "$headers" x-chalk-curiosity-home 2>/dev/null || true)
+    curiosity_home=$(header_value "$headers" x-chalk-curiosity-home 2> /dev/null || true)
     component=$(mktemp co_component_XXXXXX).c4m
     parameters=$(mktemp co_params_XXXXXX).json
     curl \
