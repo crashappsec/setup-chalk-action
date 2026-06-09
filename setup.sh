@@ -213,6 +213,8 @@ connect=${CHALK_CONNECT:-}
 saas=${CHALK_SAAS:-}
 # name of the custom profile to load
 profile=${CHALK_PROFILE:-default}
+# version/ref of the build observables action
+observables_version=${CHALK_OBSERVABLES_VERSION:-}
 # CrashOverride API token
 token=${CHALK_TOKEN:-}
 # OIDC token used to retrieve chalk token
@@ -526,6 +528,17 @@ load_custom_profile() {
     headers=$(mktemp co_headers.XXXXXX)
     result=$(mktemp co_respose.XXXXXX)
     chalk_version=$(get_chalk_version)
+    profile_query="chalkVersion=$chalk_version&chalkProfileKey=$profile&os=$os&architecture=$arch&saas=${saas:-false}&verbose=${debug:-false}"
+    curiosity_release_candidate=
+    case "$observables_version" in
+        curiosity-rc-*)
+            curiosity_release_candidate=${observables_version#curiosity-rc-}
+            curiosity_release_candidate=${curiosity_release_candidate#v}
+            ;;
+    esac
+    if [ -n "$curiosity_release_candidate" ]; then
+        profile_query="$profile_query&curiosityReleaseCandidate=$curiosity_release_candidate"
+    fi
     curl \
         --fail \
         --show-error \
@@ -534,7 +547,7 @@ load_custom_profile() {
         --request POST \
         --header "Authorization: bearer $token" \
         --dump-header "$headers" \
-        "$CHALKAPI_HOST/v0.1/profile?chalkVersion=$chalk_version&chalkProfileKey=$profile&os=$os&architecture=$arch&saas=${saas:-false}" \
+        "$CHALKAPI_HOST/v0.1/profile?$profile_query" \
         > "$result" \
         || (
             error Could not retrieve custom Chalk profile.
@@ -546,6 +559,7 @@ load_custom_profile() {
     run_setup=$(header_value "$headers" x-chalk-setup)
     build_observables=$(header_value "$headers" x-chalk-build-observables)
     curiosity_archive=$(header_value "$headers" x-chalk-curiosity-archive)
+    curiosity_home=$(header_value "$headers" x-chalk-curiosity-home 2>/dev/null || true)
     component=$(mktemp co_component_XXXXXX).c4m
     parameters=$(mktemp co_params_XXXXXX).json
     curl \
@@ -582,6 +596,12 @@ load_custom_profile() {
         info "Enabling build observables for this workflow"
         echo "setup_build_observables=true" >> "$GITHUB_OUTPUT"
         echo "curiosity_archive_url=$curiosity_archive" >> "$GITHUB_OUTPUT"
+        observables_action_version=${observables_version:-main}
+        if [ -n "$curiosity_release_candidate" ]; then
+            observables_action_version="v$curiosity_release_candidate"
+        fi
+        echo "observables_action_version=${observables_action_version:-main}" >> "$GITHUB_OUTPUT"
+        echo "curiosity_home=${curiosity_home:-/mnt/curiosity}" >> "$GITHUB_OUTPUT"
     fi
 }
 

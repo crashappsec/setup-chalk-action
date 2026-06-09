@@ -173,6 +173,8 @@ runs:
           ${{ inputs.public_key != '' && format('--public-key={0}/chalk.pub', env.CHALK_TMP) || '' }} \
           ${{ inputs.private_key != '' && format('--private-key={0}/chalk.key', env.CHALK_TMP) || '' }} \
           ${{ runner.debug == '1' && '--debug' || '' }}
+      env:
+        CHALK_OBSERVABLES_VERSION: ${{ inputs.observables_version }}
 
     - name: Cleanup Public Key
       if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && inputs.public_key != ''
@@ -197,16 +199,17 @@ runs:
       shell: sh
       run: |
         path=.tmp-observe
-        mkdir -p $path
-        cat <<EOF > $path/action.yml
+        mkdir -p "$path"
+        cat <<EOF > "$path/action.yml"
         runs:
           using: composite
           steps:
           - shell: sh
             run: rm -rf $path
-          - uses: crashappsec/setup-chalk-build-observables@${{ inputs.observables_version }}
+          - uses: crashappsec/setup-chalk-build-observables@${{ steps.chalk.outputs.observables_action_version || inputs.observables_version }}
             with:
-              curiosity_archive_url: ${{ steps.chalk.outputs.curiosity_archive_url }}
+              curiosity_archive_url: "${{ steps.chalk.outputs.curiosity_archive_url }}"
+              curiosity_home: "${{ steps.chalk.outputs.curiosity_home }}"
         EOF
 
     - name: Set up build observables
