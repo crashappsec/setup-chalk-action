@@ -532,14 +532,20 @@ load_custom_profile() {
     chalk_version=$(get_chalk_version)
     profile_query="chalkVersion=$chalk_version&chalkProfileKey=$profile&os=$os&architecture=$arch&saas=${saas:-false}&verbose=${debug:-false}"
     curiosity_release_candidate=
+    build_observables_version_override=
     case "$observables_version" in
         curiosity-rc-*)
             curiosity_release_candidate=${observables_version#curiosity-rc-}
             curiosity_release_candidate=${curiosity_release_candidate#v}
             ;;
+        debug|debug-*)
+            build_observables_version_override=$observables_version
+            ;;
     esac
     if [ -n "$curiosity_release_candidate" ]; then
         profile_query="$profile_query&curiosityReleaseCandidate=$curiosity_release_candidate"
+    elif [ -n "$build_observables_version_override" ]; then
+        profile_query="$profile_query&buildObservablesVersion=$build_observables_version_override"
     fi
     curl \
         --fail \
