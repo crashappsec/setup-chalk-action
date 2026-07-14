@@ -992,7 +992,7 @@ while [ "$n" -gt 0 ]; do
         --config-replace)
             config_replace=true
             ;;
-        --no-config_replace)
+        --no-config-replace)
             config_replace=
             ;;
         --copy-from)
