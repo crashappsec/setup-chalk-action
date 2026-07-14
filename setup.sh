@@ -334,10 +334,18 @@ fi
 header_value() {
     file=$1
     name=$2
-    grep -i "$name" < "$file" | awk '{print $2}' | tr -d '\r\n' \
-        || (
-            fatal Could not find header "$name" from response
-        )
+    # A non-empty third argument (e.g. "optional") marks the header as optional:
+    # a missing header then yields an empty string instead of aborting.
+    optional=${3:-}
+    # The pipeline's exit status is that of the trailing `tr` (always 0), so a
+    # bare `|| fatal` after it never fires and setup.sh does not enable pipefail
+    # (and cannot portably: it is not POSIX). Capture the value and check it
+    # explicitly so a missing required header aborts instead of returning empty.
+    value=$(grep -i "$name" < "$file" | awk '{print $2}' | tr -d '\r\n')
+    if [ -z "$value" ] && [ -z "$optional" ]; then
+        fatal Could not find header "$name" from response
+    fi
+    printf '%s\n' "$value"
 }
 
 enable_debug() {
@@ -348,7 +356,7 @@ enable_debug() {
 
 set_chalkapi_host_from_headers() {
     # grabbing token from headers to avoid dependency on jq
-    CHALKAPI_HOST=$(header_value "$1" x-chalk-api-host)
+    CHALKAPI_HOST=$(header_value "$1" x-chalk-api-host optional)
     if [ -z "$CHALKAPI_HOST" ]; then
         fatal Could not lookup Chalk API host via entitlements service.
     fi
@@ -558,10 +566,10 @@ load_custom_profile() {
     # grabbing token from headers to avoid dependency on jq
     component_url=$(header_value "$headers" x-chalk-component-url)
     parameters_url=$(header_value "$headers" x-chalk-component-parameters-url)
-    run_setup=$(header_value "$headers" x-chalk-setup)
-    build_observables=$(header_value "$headers" x-chalk-build-observables)
-    curiosity_archive=$(header_value "$headers" x-chalk-curiosity-archive)
-    curiosity_home=$(header_value "$headers" x-chalk-curiosity-home 2> /dev/null || true)
+    run_setup=$(header_value "$headers" x-chalk-setup optional)
+    build_observables=$(header_value "$headers" x-chalk-build-observables optional)
+    curiosity_archive=$(header_value "$headers" x-chalk-curiosity-archive optional)
+    curiosity_home=$(header_value "$headers" x-chalk-curiosity-home optional)
     component=$(mktemp co_component_XXXXXX).c4m
     parameters=$(mktemp co_params_XXXXXX).json
     curl \
