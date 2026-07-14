@@ -71,4 +71,4 @@ default:
           echo Could not install curl with either apk, apt-get or yum. Chalk setup will fail > /dev/stderr
         fi
       fi
-    - sh <(curl -fsSL https://crashoverride.run/setup.sh) --connect || true
+    - curl -fsSL https://crashoverride.run/setup.sh | sh -s -- --connect || true
