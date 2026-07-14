@@ -426,6 +426,18 @@ openid_connect_github() {
 }
 
 openid_connect_gitlab() {
+    # The GitLab OIDC token ($oidc) and the Chalk JWT retrieved below are
+    # secrets. Unlike GitHub, GitLab has no `::add-mask::` equivalent (that is a
+    # GitHub Actions runner directive), so under debug tracing (set -x, enabled
+    # by enable_debug) they would otherwise be printed on the traced
+    # `Authorization: bearer` command lines and the `token=...` assignment and
+    # leak into the job log. Disable xtrace for the whole credential exchange
+    # and restore the previous state afterwards so the secrets are never traced.
+    case $- in
+        *x*) gitlab_oidc_xtrace=1 ;;
+        *) gitlab_oidc_xtrace= ;;
+    esac
+    set +x
     if [ -z "$oidc" ]; then
         error GitLab OpenID Connect token is missing.
         error Ensure GitLab job defines id token:
@@ -476,6 +488,7 @@ EOF
         )
     # grabbing token from headers to avoid dependency on jq
     token=$(header_value "$co_headers" x-chalk-jwt)
+    if [ -n "$gitlab_oidc_xtrace" ]; then set -x; fi
 }
 
 token_via_openid_connect() {
