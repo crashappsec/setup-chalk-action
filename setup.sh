@@ -108,7 +108,7 @@ first_permissions() {
     done
     if [ "$os" = "Darwin" ]; then
         # mac uses -f for format instead of -c but on linux -f shows filesystem :shrug:
-        stat -f "$format""$path"
+        stat -f "$format" "$path"
     else
         stat -c "$format" "$path"
     fi
