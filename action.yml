@@ -99,20 +99,33 @@ runs:
     - name: Hide provided JWT token
       if: env.__CHALK_ALREADY_SETUP__ == '' && inputs.token != ''
       shell: sh
+      env:
+        INPUT_TOKEN: ${{ inputs.token }}
       run: |
-        echo "::add-mask::${{ inputs.token }}"
+        echo "::add-mask::$INPUT_TOKEN"
 
     - name: Hide provided password
       if: env.__CHALK_ALREADY_SETUP__ == '' && inputs.password != ''
       shell: sh
+      env:
+        INPUT_PASSWORD: ${{ inputs.password }}
       run: |
-        echo "::add-mask::${{ inputs.password }}"
+        echo "::add-mask::$INPUT_PASSWORD"
 
     - name: Set CHALK_PASSWORD
       if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && inputs.password != ''
       shell: sh
+      env:
+        INPUT_PASSWORD: ${{ inputs.password }}
       run: |
-        echo "CHALK_PASSWORD=${{ inputs.password }}" >> $GITHUB_ENV
+        # Write the (possibly multiline) value through a random heredoc
+        # delimiter so a crafted password cannot inject extra $GITHUB_ENV keys.
+        delimiter="CHALK_PASSWORD_EOF_$(od -An -tx1 -N16 /dev/urandom | tr -d ' \n')"
+        {
+          printf '%s<<%s\n' CHALK_PASSWORD "$delimiter"
+          printf '%s\n' "$INPUT_PASSWORD"
+          printf '%s\n' "$delimiter"
+        } >> $GITHUB_ENV
 
     - name: Save Public Key
       if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && inputs.public_key != ''
@@ -151,20 +164,27 @@ runs:
       id: chalk
       if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS')
       shell: sh
+      env:
+        CHALK_OBSERVABLES_VERSION: ${{ inputs.observables_version }}
+        ACTION_PATH: ${{ steps.action_path.outputs.value }}
+        INPUT_VERSION: ${{ inputs.version }}
+        INPUT_LATEST_VERSION_URL: ${{ inputs.latest_version_url }}
+        INPUT_LOAD: ${{ inputs.load }}
+        INPUT_PARAMS: ${{ inputs.params }}
+        INPUT_TOKEN: ${{ inputs.token }}
+        INPUT_PROFILE: ${{ inputs.profile }}
       run: |
-        ${{ steps.action_path.outputs.value }}/setup.sh \
-          --version='${{ inputs.version }}' \
-          --latest-version-url='${{ inputs.latest_version_url }}' \
-          --load='${{ inputs.load }}' \
-          --params='${{ inputs.params }}' \
-          --token='${{ inputs.token }}' \
-          --profile='${{ inputs.profile }}' \
+        "$ACTION_PATH/setup.sh" \
+          --version="$INPUT_VERSION" \
+          --latest-version-url="$INPUT_LATEST_VERSION_URL" \
+          --load="$INPUT_LOAD" \
+          --params="$INPUT_PARAMS" \
+          --token="$INPUT_TOKEN" \
+          --profile="$INPUT_PROFILE" \
           ${{ inputs.connect == 'true' && '--connect' || '' }} \
           ${{ inputs.public_key != '' && format('--public-key={0}/chalk.pub', env.CHALK_TMP) || '' }} \
           ${{ inputs.private_key != '' && format('--private-key={0}/chalk.key', env.CHALK_TMP) || '' }} \
           ${{ runner.debug == '1' && '--debug' || '' }}
-      env:
-        CHALK_OBSERVABLES_VERSION: ${{ inputs.observables_version }}
 
     - name: Cleanup Public Key
       if: always() && env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && inputs.public_key != ''
