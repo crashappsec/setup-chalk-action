@@ -182,6 +182,12 @@ if is_installed "timeout"; then
         command timeout -s KILL "${timeout}s" "$@"
     }
 else
+    # No timeout binary (e.g. a stock macOS install): fall back to running the
+    # command directly. This means the --timeout bound is NOT enforced, so a hung
+    # Chalk command can run indefinitely. Warn once so operators know the bound is
+    # silently dropped rather than assuming it is honored.
+    warn "'timeout' command not found; Chalk command timeouts (--timeout) will not be enforced." \
+        "Install coreutils (e.g. 'brew install coreutils') to enforce the bound."
     timeout() {
         "$@"
     }
