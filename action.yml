@@ -164,27 +164,25 @@ runs:
       id: chalk
       if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS')
       shell: sh
+      # setup.sh reads every parameter from a CHALK_* env var, so pass the
+      # inputs as environment data instead of splicing them into the command
+      # line. This keeps the run block free of any ${{ }} interpolation and so
+      # closes the shell/CLI injection surface entirely.
       env:
         CHALK_OBSERVABLES_VERSION: ${{ inputs.observables_version }}
+        CHALK_VERSION: ${{ inputs.version }}
+        CHALK_LATEST_VERSION_URL: ${{ inputs.latest_version_url }}
+        CHALK_LOAD: ${{ inputs.load }}
+        CHALK_PARAMS: ${{ inputs.params }}
+        CHALK_TOKEN: ${{ inputs.token }}
+        CHALK_PROFILE: ${{ inputs.profile }}
+        CHALK_CONNECT: ${{ inputs.connect == 'true' && 'true' || '' }}
+        CHALK_DEBUG: ${{ runner.debug == '1' && 'true' || '' }}
+        CHALK_PUBLIC_KEY: ${{ inputs.public_key != '' && format('{0}/chalk.pub', env.CHALK_TMP) || '' }}
+        CHALK_PRIVATE_KEY: ${{ inputs.private_key != '' && format('{0}/chalk.key', env.CHALK_TMP) || '' }}
         ACTION_PATH: ${{ steps.action_path.outputs.value }}
-        INPUT_VERSION: ${{ inputs.version }}
-        INPUT_LATEST_VERSION_URL: ${{ inputs.latest_version_url }}
-        INPUT_LOAD: ${{ inputs.load }}
-        INPUT_PARAMS: ${{ inputs.params }}
-        INPUT_TOKEN: ${{ inputs.token }}
-        INPUT_PROFILE: ${{ inputs.profile }}
       run: |
-        "$ACTION_PATH/setup.sh" \
-          --version="$INPUT_VERSION" \
-          --latest-version-url="$INPUT_LATEST_VERSION_URL" \
-          --load="$INPUT_LOAD" \
-          --params="$INPUT_PARAMS" \
-          --token="$INPUT_TOKEN" \
-          --profile="$INPUT_PROFILE" \
-          ${{ inputs.connect == 'true' && '--connect' || '' }} \
-          ${{ inputs.public_key != '' && format('--public-key={0}/chalk.pub', env.CHALK_TMP) || '' }} \
-          ${{ inputs.private_key != '' && format('--private-key={0}/chalk.key', env.CHALK_TMP) || '' }} \
-          ${{ runner.debug == '1' && '--debug' || '' }}
+        "$ACTION_PATH/setup.sh"
 
     - name: Cleanup Public Key
       if: always() && env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && inputs.public_key != ''
