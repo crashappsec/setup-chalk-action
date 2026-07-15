@@ -327,9 +327,49 @@ if ! is_installed curl; then
     }
 else
     curl() {
-        retry command curl "$@"
+        command curl "$@"
     }
 fi
+
+# curl wrapper that fails (non-zero exit) on HTTP >= 400 like --fail, but unlike
+# --fail preserves the response body so error handlers can surface the server's
+# diagnostics via `fatal "$(cat "$result")"`. Plain --fail drops the body on
+# HTTP >= 400, which left those fatal lines blank on exactly the server-error
+# paths they are meant to explain. This branches on the status via
+# -w '%{http_code}', which is far more portable than --fail-with-body
+# (curl >= 7.76). The body is buffered to a temp file and emitted once after the
+# retries so a retried request never duplicates it in the output.
+strict_curl() {
+    strict_curl_body=$(mktemp strict_curl.XXXXXX)
+    # Handle failure explicitly with `if !` instead of capturing `$?` after the
+    # call: the script runs under `set -e`, so a bare failing command would abort
+    # the shell before `$?` could be read (except where the caller happens to
+    # suspend errexit, which is fragile and shell-dependent).
+    strict_curl_rc=0
+    if ! retry strict_curl_fetch "$@"; then
+        strict_curl_rc=1
+    fi
+    cat "$strict_curl_body"
+    return "$strict_curl_rc"
+}
+
+strict_curl_fetch() {
+    # Same `set -e` reasoning: guard the request with `if !` so the http_code is
+    # captured and branched on regardless of the caller's errexit context.
+    if ! strict_curl_code=$(
+        curl --write-out '%{http_code}' --output "$strict_curl_body" "$@"
+    ); then
+        # curl itself failed (transport error, DNS, timeout, ...)
+        return 1
+    fi
+    case "$strict_curl_code" in
+        [45]*)
+            # HTTP >= 400: mirror curl --fail's failure so callers still fail
+            return 22
+            ;;
+    esac
+    return 0
+}
 
 header_value() {
     file=$1
@@ -370,8 +410,7 @@ openid_connect_github() {
     fi
     info Generating GitHub OpenID Connect JWT
     github_jwt=$(mktemp github_jwt.XXXXXX)
-    curl \
-        --fail \
+    strict_curl \
         --show-error \
         --silent \
         --location \
@@ -386,8 +425,7 @@ openid_connect_github() {
     if [ -z "$CHALKAPI_HOST" ]; then
         info Looking up Chalk API host via CrashOverride entitlement API from GitHub OpenID Connect JWT.
         entitlement_headers=$(mktemp co_ent_jwt.XXXXXX)
-        curl \
-            --fail \
+        strict_curl \
             --show-error \
             --silent \
             --location \
@@ -405,8 +443,7 @@ openid_connect_github() {
     fi
     info Authenticating to CrashOverride via GitHub OpenID Connect
     co_headers=$(mktemp co_jwt.XXXXXX)
-    curl \
-        --fail \
+    strict_curl \
         --show-error \
         --silent \
         --location \
@@ -452,8 +489,7 @@ EOF
     if [ -z "$CHALKAPI_HOST" ]; then
         info Looking up Chalk API host via CrashOverride entitlement API from GitLab OpenID Connect JWT.
         entitlement_headers=$(mktemp co_ent_jwt.XXXXXX)
-        curl \
-            --fail \
+        strict_curl \
             --show-error \
             --silent \
             --location \
@@ -471,8 +507,7 @@ EOF
     fi
     info Authenticating to CrashOverride via GitLab OpenID Connect
     co_headers=$(mktemp co_jwt.XXXXXX)
-    curl \
-        --fail \
+    strict_curl \
         --show-error \
         --silent \
         --location \
@@ -506,8 +541,7 @@ ensure_chalkapi_host() {
         info Looking up Chalk API host from entitlement service via chalk JWT.
         entitlement_headers=$(mktemp entitlement_headers.XXXXXX)
         result=$(mktemp entitlement_respose.XXXXXX)
-        curl \
-            --fail \
+        strict_curl \
             --show-error \
             --silent \
             --location \
@@ -528,8 +562,7 @@ set_profile_chalk_version() {
     ensure_chalkapi_host
     info Looking up which chalk version to install via Chalk profile from CrashOverride
     result=$(mktemp chalk_version.XXXXXX)
-    curl \
-        --fail \
+    strict_curl \
         --show-error \
         --silent \
         --location \
@@ -562,8 +595,7 @@ load_custom_profile() {
     if [ -n "$curiosity_release_candidate" ]; then
         profile_query="$profile_query&curiosityReleaseCandidate=$curiosity_release_candidate"
     fi
-    curl \
-        --fail \
+    strict_curl \
         --show-error \
         --silent \
         --location \
@@ -585,8 +617,7 @@ load_custom_profile() {
     curiosity_home=$(header_value "$headers" x-chalk-curiosity-home optional)
     component=$(mktemp co_component_XXXXXX).c4m
     parameters=$(mktemp co_params_XXXXXX).json
-    curl \
-        --fail \
+    strict_curl \
         --show-error \
         --silent \
         --location \
@@ -596,8 +627,7 @@ load_custom_profile() {
             error Could not retrieve custom Chalk profile component.
             fatal "$(cat "$component")"
         )
-    curl \
-        --fail \
+    strict_curl \
         --show-error \
         --silent \
         --location \
@@ -645,7 +675,7 @@ get_chalk_version() {
 # find out latest chalk version
 set_latest_version() {
     info Querying latest version of chalk
-    version=$(curl -fsSL "$latest_version_url")
+    version=$(strict_curl -sSL "$latest_version_url")
     info Latest version is "$version"
 }
 
@@ -681,22 +711,20 @@ download_chalk() {
     url=$URL_PREFIX/$(chalk_folder)/$name
     info Downloading Chalk from "$url"
     rm -f "$TMP/$name" "$TMP/$name.sha256"
-    curl \
-        --fail \
+    strict_curl \
         --show-error \
         --silent \
         --location \
-        --output "$TMP/$name" \
-        "$url" || (
+        "$url" \
+        > "$TMP/$name" || (
         fatal Could not download "$name". Are you sure this is a valid version?
     )
-    curl \
-        --fail \
+    strict_curl \
         --show-error \
         --silent \
         --location \
-        --output "$TMP/$name.sha256" \
-        "$url.sha256" || (
+        "$url.sha256" \
+        > "$TMP/$name.sha256" || (
         fatal Could not download checksum to validate "$name" integrity
     )
     if ! [ -f "$chalk_tmp" ]; then
