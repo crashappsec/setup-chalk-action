@@ -167,7 +167,7 @@ runs:
         CHALK_OBSERVABLES_VERSION: ${{ inputs.observables_version }}
 
     - name: Cleanup Public Key
-      if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && inputs.public_key != ''
+      if: always() && env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && inputs.public_key != ''
       shell: sh
       env:
         CHALK_PUBLIC_KEY: "${{ inputs.public_key }}"
@@ -175,7 +175,7 @@ runs:
         rm "$CHALK_TMP/chalk.pub"
 
     - name: Cleanup Private Key
-      if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && inputs.private_key != ''
+      if: always() && env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && inputs.private_key != ''
       shell: sh
       env:
         CHALK_PRIVATE_KEY: "${{ inputs.private_key }}"
