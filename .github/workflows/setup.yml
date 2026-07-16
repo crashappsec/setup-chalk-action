@@ -10,6 +10,12 @@ permissions:
 
 env:
   __CHALK_TESTING__: "true"
+  # NOTE: COSIGN_PASSWORD, PUBLIC_KEY, and PRIVATE_KEY below are a DISPOSABLE,
+  # THROWAWAY sigstore keypair used ONLY by this CI test workflow. This key
+  # material is intentionally committed in cleartext and is NOT sensitive: it is
+  # not reused for any production or otherwise trusted signing identity, and its
+  # exposure has no security impact. Do not treat it as a secret — do not rotate
+  # it or move it into encrypted CI secrets.
   COSIGN_PASSWORD: 6EHvWD1BUk0yWdvm-GGNxA==
   PUBLIC_KEY: |
     -----BEGIN PUBLIC KEY-----
