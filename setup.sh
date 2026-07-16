@@ -401,7 +401,7 @@ enable_debug() {
 }
 
 set_chalkapi_host_from_headers() {
-    # grabbing token from headers to avoid dependency on jq
+    # grab the Chalk API host from the response headers to avoid a dependency on jq
     CHALKAPI_HOST=$(header_value "$1" x-chalk-api-host optional)
     if [ -z "$CHALKAPI_HOST" ]; then
         fatal Could not lookup Chalk API host via entitlements service.
@@ -614,7 +614,7 @@ load_custom_profile() {
             error Could not retrieve custom Chalk profile.
             fatal "$(cat "$result")"
         )
-    # grabbing token from headers to avoid dependency on jq
+    # parse the component/parameter URLs and feature flags from the response headers to avoid a dependency on jq
     component_url=$(header_value "$headers" x-chalk-component-url)
     parameters_url=$(header_value "$headers" x-chalk-component-parameters-url)
     run_setup=$(header_value "$headers" x-chalk-setup optional)
