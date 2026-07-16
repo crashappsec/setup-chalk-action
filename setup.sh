@@ -939,6 +939,11 @@ EOF
     exit "${1:-0}"
 }
 
+# has_value succeeds (returns 0) when the next positional token "$1" is a real
+# value rather than another flag. A leading "--" means "$1" is the next flag
+# (so the current flag has no value of its own); no args left likewise means no
+# value. Pass 1 below uses `! has_value` to append an empty placeholder value
+# after any "--flag" that was given without one.
 has_value() {
     if [ $# -eq 0 ]; then
         return 1
@@ -953,38 +958,69 @@ has_value() {
     esac
 }
 
+# Pass 1 of 2: normalize every argument into a fixed "<flag> <value>" 2-token
+# shape. All of these spellings
+#     --version=1   --version 1   --version= 1   --version =1   --version = 1
+# are rewritten to exactly two tokens: "--version" "1". A "--flag" given with no
+# value (bare --version, or a value-less flag like --connect/--saas) is rewritten
+# to "--flag" "" -- an empty placeholder value is always appended so that Pass 2
+# can unconditionally consume a value token for every long flag. Args are rotated
+# in place: `shift` drops the original token off the front and `set -- "$@" ...`
+# appends the normalized token(s) to the back, so after $# iterations only
+# normalized tokens remain. Single-dash flags (-vv, -h) take no value and are NOT
+# normalized -- they pass through unchanged via the *) arm as a single token.
 for arg; do
     shift
     case "$arg" in
+        # bare "=" (from "--flag = value"): the "=" arrived as its own token, so
+        # drop it, appending a placeholder if no real value follows.
         =)
             if ! has_value "$@"; then
                 set -- "$@" ""
             fi
             ;;
+        # "--flag=" (trailing "="; from "--flag= value"): emit the flag, then a
+        # real value if one follows else an empty placeholder.
         --*=)
             set -- "$@" "${arg%%=*}"
             if ! has_value "$@"; then
                 set -- "$@" ""
             fi
             ;;
+        # "=value" (from "--flag =value"): emit just the value; the flag itself
+        # was emitted when the preceding "--flag" token matched the --*) arm.
         =*)
             set -- "$@" "${arg#*=}"
             ;;
+        # "--flag=value": split the single token into flag and value.
         --*=*)
             set -- "$@" "${arg%%=*}" "${arg#*=}"
             ;;
+        # "--flag" (no "="): emit the flag, then a real value if the next token
+        # is one else an empty placeholder.
         --*)
             set -- "$@" "$arg"
             if ! has_value "$@"; then
                 set -- "$@" ""
             fi
             ;;
+        # positional or single-dash token (e.g. -vv, -h): pass through unchanged.
         *)
             set -- "$@" "$arg"
             ;;
     esac
 done
 
+# Pass 2 of 2: consume the normalized tokens. Because Pass 1 guaranteed every
+# long "--flag" is followed by exactly one value token (a real value or the ""
+# placeholder), each --flag consumes TWO tokens per iteration:
+#   * the `shift; n=$((n - 1))` just below consumes the flag token (into $arg);
+#   * the first `case "$arg"` reads that flag's value from $1 WITHOUT shifting;
+#   * the trailing `case "$arg" in --*)` at the bottom of the loop consumes the
+#     value token with a SECOND `shift; n=$((n - 1))`.
+# Single-dash flags (-vv, -h) have no value token, do not match that trailing
+# --*) arm, and so consume only one token. The two shift sites must stay in
+# sync: the flag token is dropped at the top, its value token at the bottom.
 n=$#
 while [ "$n" -gt 0 ]; do
     arg=${1:-}
@@ -1077,6 +1113,9 @@ while [ "$n" -gt 0 ]; do
             help 1
             ;;
     esac
+    # Consume the value token that Pass 1 guaranteed follows every long "--flag"
+    # (its real value, or the "" placeholder). This is the second of the two
+    # tokens each --flag consumes -- see the Pass 2 header comment above.
     case "$arg" in
         --*)
             n=$((n - 1))
