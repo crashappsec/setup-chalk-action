@@ -370,7 +370,16 @@ strict_curl_fetch() {
     fi
     case "$strict_curl_code" in
         [45]*)
-            # HTTP >= 400: mirror curl --fail's failure so callers still fail
+            # HTTP >= 400: mirror curl --fail's failure so callers still fail.
+            # Without --fail curl exits 0 and --show-error stays silent, so the
+            # status line `curl --fail --show-error` used to print
+            # ("curl: (22) The requested URL returned error: <code>") is
+            # otherwise lost -- the single most useful triage datum at the call
+            # sites that discard the body to /dev/null. Emit the code ourselves.
+            # Deliberately omit "$@": it carries the `Authorization: bearer
+            # <token>` header on the auth/entitlement calls, which would leak
+            # the credential into the job log.
+            error "HTTP request failed with status $strict_curl_code"
             return 22
             ;;
     esac
