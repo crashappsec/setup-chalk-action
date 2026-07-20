@@ -349,6 +349,19 @@ fi
 # -w '%{http_code}', which is far more portable than --fail-with-body
 # (curl >= 7.76). The body is buffered to a temp file and emitted once after the
 # retries so a retried request never duplicates it in the output.
+#
+# Caller contract:
+#   * The response body is written to STDOUT -- capture it with
+#     `$(strict_curl ...)` or redirect it with `> file`. It is never written to
+#     a caller-named path.
+#   * Do NOT pass `--output`/`-o`. strict_curl_fetch already uses `--output`
+#     internally to buffer the body; a second `--output` would divert the body
+#     and leave the buffered temp file empty, silently breaking the
+#     error-body-on-failure behavior. (See grouped-003 before adding any
+#     output-path parameter -- it wants to extend this interface.)
+#   * Retry lives here: strict_curl wraps strict_curl_fetch in `retry`. The bare
+#     curl() wrapper above is intentionally un-retried, so new HTTP calls must go
+#     through strict_curl (not bare curl()) to keep retry coverage.
 strict_curl() {
     strict_curl_body=$(mktemp strict_curl.XXXXXX)
     # Handle failure explicitly with `if !` instead of capturing `$?` after the
@@ -356,7 +369,7 @@ strict_curl() {
     # the shell before `$?` could be read (except where the caller happens to
     # suspend errexit, which is fragile and shell-dependent).
     strict_curl_rc=0
-    if ! retry strict_curl_fetch "$@"; then
+    if ! retry strict_curl_fetch "$strict_curl_body" "$@"; then
         strict_curl_rc=1
     fi
     cat "$strict_curl_body"
@@ -364,10 +377,16 @@ strict_curl() {
 }
 
 strict_curl_fetch() {
+    # The response-body temp file is supplied explicitly by the caller
+    # (strict_curl) as the first positional argument; everything after it is
+    # forwarded verbatim to curl. Reading it from $1 rather than an unset global
+    # is what lets this function be reasoned about (and retried) on its own.
+    strict_curl_fetch_body=$1
+    shift
     # Same `set -e` reasoning: guard the request with `if !` so the http_code is
     # captured and branched on regardless of the caller's errexit context.
     if ! strict_curl_code=$(
-        curl --write-out '%{http_code}' --output "$strict_curl_body" "$@"
+        curl --write-out '%{http_code}' --output "$strict_curl_fetch_body" "$@"
     ); then
         # curl itself failed (transport error, DNS, timeout, ...)
         return 1
