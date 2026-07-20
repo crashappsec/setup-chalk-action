@@ -190,7 +190,7 @@ runs:
       env:
         CHALK_PUBLIC_KEY: "${{ inputs.public_key }}"
       run: |
-        rm "$CHALK_TMP/chalk.pub"
+        rm -f "$CHALK_TMP/chalk.pub"
 
     - name: Cleanup Private Key
       if: always() && env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && inputs.private_key != ''
@@ -198,7 +198,7 @@ runs:
       env:
         CHALK_PRIVATE_KEY: "${{ inputs.private_key }}"
       run: |
-        rm "$CHALK_TMP/chalk.key"
+        rm -f "$CHALK_TMP/chalk.key"
 
     # github doesnt support using inputs for the action version
     # so we template inline action
