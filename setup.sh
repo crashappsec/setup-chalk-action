@@ -222,9 +222,13 @@ profile=${CHALK_PROFILE:-default}
 # version/ref of the build observables action
 observables_version=${CHALK_OBSERVABLES_VERSION:-}
 # CrashOverride API token
-token=${CHALK_TOKEN:-}
-# OIDC token used to retrieve chalk token
-oidc=${CHALK_OIDC:-}
+# Strip any CR/LF the same way the --token CLI arm does: a trailing newline
+# (from a secret echoed/pasted with one) must not leak into the
+# `Authorization: bearer $token` header, where it would break auth or split
+# into a second header line.
+token=$(printf '%s' "${CHALK_TOKEN:-}" | tr -d '\r\n')
+# OIDC token used to retrieve chalk token (same CR/LF sanitization as --oidc)
+oidc=$(printf '%s' "${CHALK_OIDC:-}" | tr -d '\r\n')
 # ${prefix}/bin is where script should install chalk and wrapped commands
 prefix=${CHALK_PREFIX:-$(default_prefix)}
 # whether to overwrite existing chalk binary
