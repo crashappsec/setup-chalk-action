@@ -409,19 +409,33 @@ strict_curl_fetch() {
     return 0
 }
 
+# optional_header_value FILE NAME
+# Print the value of header NAME from the dumped-header FILE, or an empty
+# string when the header is absent. Use this only for headers whose absence
+# is acceptable to the caller; headers that must be present go through
+# header_value instead.
+#
+# The pipeline's exit status is that of the trailing `tr` (always 0), so a
+# bare `|| fatal` on a caller never fires and setup.sh does not enable
+# pipefail (and cannot portably: it is not POSIX). Callers that require the
+# header must therefore check the captured value explicitly -- header_value
+# does exactly that.
+optional_header_value() {
+    grep -i "$2" < "$1" | awk '{print $2}' | tr -d '\r\n'
+}
+
+# header_value FILE NAME [MESSAGE]
+# Print the value of a REQUIRED header NAME from FILE, aborting via `fatal`
+# when the header is absent. MESSAGE overrides the default abort text so a
+# caller can supply a domain-specific error without re-implementing the
+# empty-check itself. The abort relies on this function running inside a
+# `$(...)` substitution under `set -e`, matching every other required caller.
 header_value() {
     file=$1
     name=$2
-    # A non-empty third argument (e.g. "optional") marks the header as optional:
-    # a missing header then yields an empty string instead of aborting.
-    optional=${3:-}
-    # The pipeline's exit status is that of the trailing `tr` (always 0), so a
-    # bare `|| fatal` after it never fires and setup.sh does not enable pipefail
-    # (and cannot portably: it is not POSIX). Capture the value and check it
-    # explicitly so a missing required header aborts instead of returning empty.
-    value=$(grep -i "$name" < "$file" | awk '{print $2}' | tr -d '\r\n')
-    if [ -z "$value" ] && [ -z "$optional" ]; then
-        fatal Could not find header "$name" from response
+    value=$(optional_header_value "$file" "$name")
+    if [ -z "$value" ]; then
+        fatal "${3:-Could not find header $name from response}"
     fi
     printf '%s\n' "$value"
 }
@@ -434,10 +448,8 @@ enable_debug() {
 
 set_chalkapi_host_from_headers() {
     # grab the Chalk API host from the response headers to avoid a dependency on jq
-    CHALKAPI_HOST=$(header_value "$1" x-chalk-api-host optional)
-    if [ -z "$CHALKAPI_HOST" ]; then
-        fatal Could not lookup Chalk API host via entitlements service.
-    fi
+    CHALKAPI_HOST=$(header_value "$1" x-chalk-api-host \
+        "Could not lookup Chalk API host via entitlements service.")
 }
 
 openid_connect_github() {
@@ -649,10 +661,10 @@ load_custom_profile() {
     # parse the component/parameter URLs and feature flags from the response headers to avoid a dependency on jq
     component_url=$(header_value "$headers" x-chalk-component-url)
     parameters_url=$(header_value "$headers" x-chalk-component-parameters-url)
-    run_setup=$(header_value "$headers" x-chalk-setup optional)
-    build_observables=$(header_value "$headers" x-chalk-build-observables optional)
-    curiosity_archive=$(header_value "$headers" x-chalk-curiosity-archive optional)
-    curiosity_home=$(header_value "$headers" x-chalk-curiosity-home optional)
+    run_setup=$(optional_header_value "$headers" x-chalk-setup)
+    build_observables=$(optional_header_value "$headers" x-chalk-build-observables)
+    curiosity_archive=$(optional_header_value "$headers" x-chalk-curiosity-archive)
+    curiosity_home=$(optional_header_value "$headers" x-chalk-curiosity-home)
     component=$(mktemp co_component_XXXXXX).c4m
     parameters=$(mktemp co_params_XXXXXX).json
     strict_curl \
