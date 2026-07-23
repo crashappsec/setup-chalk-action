@@ -8,6 +8,7 @@ services:
     user: ${USER:-root}
     environment:
       CHALK_PASSWORD: ${CHALK_PASSWORD:-}
+      __CHALK_TESTING__: ${__CHALK_TESTING__:-}
     volumes:
       - ../:/action
       - ../../chalk:/chalk
