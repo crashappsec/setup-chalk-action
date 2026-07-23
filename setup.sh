@@ -32,15 +32,21 @@ color() {
 }
 
 info() {
-    echo "$(color green INFO:)" "$@" > /dev/stderr
+    if [ -n "$*" ]; then
+        echo "$(color green INFO:)" "$@" > /dev/stderr
+    fi
 }
 
 warn() {
-    echo "$(color yellow WARN:)" "$@" > /dev/stderr
+    if [ -n "$*" ]; then
+        echo "$(color yellow WARN:)" "$@" > /dev/stderr
+    fi
 }
 
 error() {
-    echo "$(color red ERROR:)" "$@" > /dev/stderr
+    if [ -n "$*" ]; then
+        echo "$(color red ERROR:)" "$@" > /dev/stderr
+    fi
 }
 
 fatal() {
@@ -108,7 +114,7 @@ first_permissions() {
     done
     if [ "$os" = "Darwin" ]; then
         # mac uses -f for format instead of -c but on linux -f shows filesystem :shrug:
-        stat -f "$format""$path"
+        stat -f "$format" "$path"
     else
         stat -c "$format" "$path"
     fi
@@ -182,6 +188,12 @@ if is_installed "timeout"; then
         command timeout -s KILL "${timeout}s" "$@"
     }
 else
+    # No timeout binary (e.g. a stock macOS install): fall back to running the
+    # command directly. This means the --timeout bound is NOT enforced, so a hung
+    # Chalk command can run indefinitely. Warn once so operators know the bound is
+    # silently dropped rather than assuming it is honored.
+    warn "'timeout' command not found; Chalk command timeouts (--timeout) will not be enforced." \
+        "Install coreutils (e.g. 'brew install coreutils') to enforce the bound."
     timeout() {
         "$@"
     }
@@ -216,9 +228,13 @@ profile=${CHALK_PROFILE:-default}
 # version/ref of the build observables action
 observables_version=${CHALK_OBSERVABLES_VERSION:-}
 # CrashOverride API token
-token=${CHALK_TOKEN:-}
-# OIDC token used to retrieve chalk token
-oidc=${CHALK_OIDC:-}
+# Strip any CR/LF the same way the --token CLI arm does: a trailing newline
+# (from a secret echoed/pasted with one) must not leak into the
+# `Authorization: bearer $token` header, where it would break auth or split
+# into a second header line.
+token=$(printf '%s' "${CHALK_TOKEN:-}" | tr -d '\r\n')
+# OIDC token used to retrieve chalk token (same CR/LF sanitization as --oidc)
+oidc=$(printf '%s' "${CHALK_OIDC:-}" | tr -d '\r\n')
 # ${prefix}/bin is where script should install chalk and wrapped commands
 prefix=${CHALK_PREFIX:-$(default_prefix)}
 # whether to overwrite existing chalk binary
@@ -321,23 +337,122 @@ retry() {
     done
 }
 
+get_kwarg() {
+    opt="$1"
+    shift
+    default="$1"
+    shift
+    value="$default"
+    for arg; do
+        shift
+        case "$arg" in
+            "$opt")
+                value=$1
+                break
+                ;;
+            *) ;;
+
+        esac
+    done
+    echo "$value"
+}
+
+first_arg() {
+    for arg; do
+        shift
+        case "$arg" in
+            -*) ;;
+            *)
+                echo "$arg"
+                ;;
+        esac
+    done
+}
+
 if ! is_installed curl; then
     curl() {
         fatal curl is not installed
     }
 else
     curl() {
-        retry command curl "$@"
+        _tmperr=$(mktemp curl_err.XXXXXX)
+        _url=$(first_arg "$@")
+        # --write-out '%{http_code}' requires --output to avoid mixing the
+        # status code into the body. If the caller didn't pass --output,
+        # buffer to a temp file and cat it on success so the API is transparent.
+        _curl_output=$(get_kwarg --output "" "$@")
+        _curl_has_output=true
+        if [ -z "$_curl_output" ]; then
+            _curl_has_output=
+            _curl_output=$(mktemp curl_out.XXXXXX)
+            set -- "$@" "--output" "$_curl_output"
+        fi
+        if ! _http_code=$(
+            command curl --write-out '%{http_code}' "$@" 2> "$_tmperr"
+        ); then
+            # Transport error (DNS, timeout, connection refused): copy stderr to
+            # both the console and the output file so fatal_curl can surface it.
+            cat "$_tmperr" >&2
+            cat "$_tmperr" > "$_curl_output"
+            return 1
+        fi
+        case "$_http_code" in
+            [45]*)
+                error "HTTP error with status $_http_code @ $_url"
+                return 22
+                ;;
+        esac
+        if [ -z "$_curl_has_output" ]; then
+            cat "$_curl_output"
+        fi
+        return 0
     }
 fi
 
-header_value() {
-    file=$1
-    name=$2
-    grep -i "$name" < "$file" | awk '{print $2}' | tr -d '\r\n' \
-        || (
-            fatal Could not find header "$name" from response
-        )
+# curl wrapper that fatally exits on any HTTP or transport failure.
+#
+# Usage:  fatal_curl [MSG ...] -- CURL_ARGS...
+#   MSG        Zero or more lines emitted via `error` before the fatal.
+#              Separated from curl args by the literal "--" sentinel.
+#   CURL_ARGS  Forwarded verbatim to curl(), including any --output/-o.
+#
+# On failure, context messages are printed then the function fatals with the
+# server response body (or the transport error text when curl itself fails).
+# Retry lives here; the bare curl() above is intentionally un-retried.
+fatal_curl() {
+    _curl_error_msgs=
+    for arg; do
+        shift
+        case "$arg" in
+            --)
+                break
+                ;;
+            *)
+                _curl_error_msgs="${_curl_error_msgs}${arg}
+"
+                ;;
+        esac
+    done
+    _url=$(first_arg "$@")
+    _curl_output=$(get_kwarg --output "" "$@")
+    if ! retry curl "$@"; then
+        printf '%s' "$_curl_error_msgs" | while IFS= read -r _curl_error_msg; do
+            error "$_curl_error_msg"
+        done
+        if [ -n "$_curl_output" ]; then
+            fatal "$(cat "$_curl_output")"
+        else
+            fatal curl "$_url"
+        fi
+    fi
+}
+
+# optional_header_value FILE NAME
+# Print the value of header NAME from the dumped-header FILE, or an empty
+# string when the header is absent. Callers that require the header must check
+# the result in the parent shell: `[ -z "$v" ] && fatal "..."`.
+optional_header_value() {
+    grep -i "$2" < "$1" | awk '{print $2}' | tr -d '\r\n'
 }
 
 enable_debug() {
@@ -347,11 +462,9 @@ enable_debug() {
 }
 
 set_chalkapi_host_from_headers() {
-    # grabbing token from headers to avoid dependency on jq
-    CHALKAPI_HOST=$(header_value "$1" x-chalk-api-host)
-    if [ -z "$CHALKAPI_HOST" ]; then
-        fatal Could not lookup Chalk API host via entitlements service.
-    fi
+    # grab the Chalk API host from the response headers to avoid a dependency on jq
+    CHALKAPI_HOST=$(optional_header_value "$1" x-chalk-api-host)
+    [ -n "$CHALKAPI_HOST" ] || fatal "Could not lookup Chalk API host via entitlements service."
 }
 
 openid_connect_github() {
@@ -362,24 +475,25 @@ openid_connect_github() {
     fi
     info Generating GitHub OpenID Connect JWT
     github_jwt=$(mktemp github_jwt.XXXXXX)
-    curl \
-        --fail \
+    fatal_curl \
+        "Cannot generate GitHub OpenId Connect JWT Token." \
+        "Please make sure workflow/job has 'id-token: write' permission." \
+        "See https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect#adding-permissions-settings" \
+        -- \
+        "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://crashoverride.run" \
         --show-error \
         --silent \
         --location \
         --header "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-        "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://crashoverride.run" \
-        > "$github_jwt" \
-        || (
-            error Cannot generate GitHub OpenId Connect JWT Token.
-            error Please make sure workflow/job has "'id-token: write'" permission.
-            fatal See https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect#adding-permissions-settings
-        )
+        --output "$github_jwt"
     if [ -z "$CHALKAPI_HOST" ]; then
         info Looking up Chalk API host via CrashOverride entitlement API from GitHub OpenID Connect JWT.
         entitlement_headers=$(mktemp co_ent_jwt.XXXXXX)
-        curl \
-            --fail \
+        fatal_curl \
+            "Could not lookup Chalk API host from entitlements service via GitHub OpenID Connect JWT." \
+            "Please make sure GitHub integration is configured in your CrashOverride workspace." \
+            -- \
+            "$ENTITLEMENTS_HOST/v0.1/routes/oidc/github?verbose=${debug:-false}" \
             --show-error \
             --silent \
             --location \
@@ -387,18 +501,16 @@ openid_connect_github() {
             --header 'Content-Type: application/json' \
             --data-binary @"$github_jwt" \
             --dump-header "$entitlement_headers" \
-            "$ENTITLEMENTS_HOST/v0.1/routes/oidc/github?verbose=${debug:-false}" \
-            > /dev/null \
-            || (
-                error Could not lookup Chalk API host from entitlements service via GitHub OpenID Connect JWT.
-                fatal Please make sure GitHub integration is configured in your CrashOverride workspace.
-            )
+            > /dev/null
         set_chalkapi_host_from_headers "$entitlement_headers"
     fi
     info Authenticating to CrashOverride via GitHub OpenID Connect
     co_headers=$(mktemp co_jwt.XXXXXX)
-    curl \
-        --fail \
+    fatal_curl \
+        "Could not retrieve Chalk JWT token from GitHub OpenID Connect JWT." \
+        "Please make sure GitHub integration is configured in your CrashOverride workspace." \
+        -- \
+        "$CHALKAPI_HOST/v0.1/openid-connect/github?verbose=${debug:-false}" \
         --show-error \
         --silent \
         --location \
@@ -406,18 +518,26 @@ openid_connect_github() {
         --header 'Content-Type: application/json' \
         --data-binary @"$github_jwt" \
         --dump-header "$co_headers" \
-        "$CHALKAPI_HOST/v0.1/openid-connect/github?verbose=${debug:-false}" \
-        > /dev/null \
-        || (
-            error Could not retrieve Chalk JWT token from GitHub OpenID Connect JWT.
-            fatal Please make sure GitHub integration is configured in your CrashOverride workspace.
-        )
+        > /dev/null
     # grabbing token from headers to avoid dependency on jq
-    token=$(header_value "$co_headers" x-chalk-jwt)
+    token=$(optional_header_value "$co_headers" x-chalk-jwt)
+    [ -z "$token" ] && fatal "Could not find header x-chalk-jwt from response"
     echo "::add-mask::$token"
 }
 
 openid_connect_gitlab() {
+    # The GitLab OIDC token ($oidc) and the Chalk JWT retrieved below are
+    # secrets. Unlike GitHub, GitLab has no `::add-mask::` equivalent (that is a
+    # GitHub Actions runner directive), so under debug tracing (set -x, enabled
+    # by enable_debug) they would otherwise be printed on the traced
+    # `Authorization: bearer` command lines and the `token=...` assignment and
+    # leak into the job log. Disable xtrace for the whole credential exchange
+    # and restore the previous state afterwards so the secrets are never traced.
+    case $- in
+        *x*) gitlab_oidc_xtrace=1 ;;
+        *) gitlab_oidc_xtrace= ;;
+    esac
+    set +x
     if [ -z "$oidc" ]; then
         error GitLab OpenID Connect token is missing.
         error Ensure GitLab job defines id token:
@@ -432,8 +552,11 @@ EOF
     if [ -z "$CHALKAPI_HOST" ]; then
         info Looking up Chalk API host via CrashOverride entitlement API from GitLab OpenID Connect JWT.
         entitlement_headers=$(mktemp co_ent_jwt.XXXXXX)
-        curl \
-            --fail \
+        fatal_curl \
+            "Could not lookup Chalk API host from entitlements service via GitLab OpenID Connect JWT." \
+            "Please make sure GitLab integration is configured in your CrashOverride workspace." \
+            -- \
+            "$ENTITLEMENTS_HOST/v0.1/routes/oidc/gitlab?verbose=${debug:-false}" \
             --show-error \
             --silent \
             --location \
@@ -441,18 +564,16 @@ EOF
             --header 'Content-Type: application/json' \
             --header "Authorization: bearer $oidc" \
             --dump-header "$entitlement_headers" \
-            "$ENTITLEMENTS_HOST/v0.1/routes/oidc/gitlab?verbose=${debug:-false}" \
-            > /dev/null \
-            || (
-                error Could not lookup Chalk API host from entitlements service via GitLab OpenID Connect JWT.
-                fatal Please make sure GitLab integration is configured in your CrashOverride workspace.
-            )
+            > /dev/null
         set_chalkapi_host_from_headers "$entitlement_headers"
     fi
     info Authenticating to CrashOverride via GitLab OpenID Connect
     co_headers=$(mktemp co_jwt.XXXXXX)
-    curl \
-        --fail \
+    fatal_curl \
+        "Could not retrieve Chalk JWT token from GitLab OpenID Connect JWT." \
+        "Please make sure GitLab integration is configured in your CrashOverride workspace." \
+        -- \
+        "$CHALKAPI_HOST/v0.1/openid-connect/gitlab?verbose=${debug:-false}" \
         --show-error \
         --silent \
         --location \
@@ -460,14 +581,11 @@ EOF
         --header 'Content-Type: application/json' \
         --header "Authorization: bearer $oidc" \
         --dump-header "$co_headers" \
-        "$CHALKAPI_HOST/v0.1/openid-connect/gitlab?verbose=${debug:-false}" \
-        > /dev/null \
-        || (
-            error Could not retrieve Chalk JWT token from GitLab OpenID Connect JWT.
-            fatal Please make sure GitLab integration is configured in your CrashOverride workspace.
-        )
+        > /dev/null
     # grabbing token from headers to avoid dependency on jq
-    token=$(header_value "$co_headers" x-chalk-jwt)
+    token=$(optional_header_value "$co_headers" x-chalk-jwt)
+    [ -z "$token" ] && fatal "Could not find header x-chalk-jwt from response"
+    if [ -n "$gitlab_oidc_xtrace" ]; then set -x; fi
 }
 
 token_via_openid_connect() {
@@ -484,21 +602,17 @@ ensure_chalkapi_host() {
     if [ -z "$CHALKAPI_HOST" ]; then
         info Looking up Chalk API host from entitlement service via chalk JWT.
         entitlement_headers=$(mktemp entitlement_headers.XXXXXX)
-        result=$(mktemp entitlement_respose.XXXXXX)
-        curl \
-            --fail \
+        fatal_curl \
+            "Could not lookup Chalk API host from entitlements service via chalk JWT." \
+            -- \
+            "$ENTITLEMENTS_HOST/v0.1/routes/chalkapi?verbose=${debug:-false}" \
             --show-error \
             --silent \
             --location \
             --request GET \
             --header "Authorization: bearer $token" \
             --dump-header "$entitlement_headers" \
-            "$ENTITLEMENTS_HOST/v0.1/routes/chalkapi?verbose=${debug:-false}" \
-            > "$result" \
-            || (
-                error Could not lookup Chalk API host from entitlements service via GitHub OpenID Connect JWT.
-                fatal "$(cat "$result")"
-            )
+            > /dev/null
         set_chalkapi_host_from_headers "$entitlement_headers"
     fi
 }
@@ -507,20 +621,17 @@ set_profile_chalk_version() {
     ensure_chalkapi_host
     info Looking up which chalk version to install via Chalk profile from CrashOverride
     result=$(mktemp chalk_version.XXXXXX)
-    curl \
-        --fail \
+    fatal_curl \
+        "Could not lookup chalk version to install via Chalk profile." \
+        -- \
+        "$CHALKAPI_HOST/v0.1/profile/version?chalkProfileKey=$profile&verbose=${debug:-false}" \
         --show-error \
         --silent \
         --location \
         --request GET \
         --header "Authorization: bearer $token" \
-        "$CHALKAPI_HOST/v0.1/profile/version?chalkProfileKey=$profile&verbose=${debug:-false}" \
-        > "$result" \
-        || (
-            error Could not lookup chalk version to install via Chalk profile.
-            fatal "$(cat "$result")"
-        )
-    version=$(cat "$result")
+        --output "$result"
+    version=$(tr -d '\r\n' < "$result")
     info Chalk profile is configured to use version: "$version"
 }
 
@@ -528,7 +639,6 @@ load_custom_profile() {
     ensure_chalkapi_host
     info Loading custom Chalk profile from CrashOverride
     headers=$(mktemp co_headers.XXXXXX)
-    result=$(mktemp co_respose.XXXXXX)
     chalk_version=$(get_chalk_version)
     profile_query="chalkVersion=$chalk_version&chalkProfileKey=$profile&os=$os&architecture=$arch&saas=${saas:-false}&verbose=${debug:-false}"
     curiosity_release_candidate=
@@ -541,52 +651,45 @@ load_custom_profile() {
     if [ -n "$curiosity_release_candidate" ]; then
         profile_query="$profile_query&curiosityReleaseCandidate=$curiosity_release_candidate"
     fi
-    curl \
-        --fail \
+    fatal_curl \
+        "Could not retrieve custom Chalk profile." \
+        -- \
+        "$CHALKAPI_HOST/v0.1/profile?$profile_query" \
         --show-error \
         --silent \
         --location \
         --request POST \
         --header "Authorization: bearer $token" \
         --dump-header "$headers" \
-        "$CHALKAPI_HOST/v0.1/profile?$profile_query" \
-        > "$result" \
-        || (
-            error Could not retrieve custom Chalk profile.
-            fatal "$(cat "$result")"
-        )
-    # grabbing token from headers to avoid dependency on jq
-    component_url=$(header_value "$headers" x-chalk-component-url)
-    parameters_url=$(header_value "$headers" x-chalk-component-parameters-url)
-    run_setup=$(header_value "$headers" x-chalk-setup)
-    build_observables=$(header_value "$headers" x-chalk-build-observables)
-    curiosity_archive=$(header_value "$headers" x-chalk-curiosity-archive)
-    curiosity_home=$(header_value "$headers" x-chalk-curiosity-home 2> /dev/null || true)
+        > /dev/null
+    # parse the component/parameter URLs and feature flags from the response headers to avoid a dependency on jq
+    component_url=$(optional_header_value "$headers" x-chalk-component-url)
+    parameters_url=$(optional_header_value "$headers" x-chalk-component-parameters-url)
+    [ -z "$component_url" ] && fatal "Could not find header x-chalk-component-url from response"
+    [ -z "$parameters_url" ] && fatal "Could not find header x-chalk-component-parameters-url from response"
+    run_setup=$(optional_header_value "$headers" x-chalk-setup)
+    build_observables=$(optional_header_value "$headers" x-chalk-build-observables)
+    curiosity_archive=$(optional_header_value "$headers" x-chalk-curiosity-archive)
+    curiosity_home=$(optional_header_value "$headers" x-chalk-curiosity-home)
     component=$(mktemp co_component_XXXXXX).c4m
     parameters=$(mktemp co_params_XXXXXX).json
-    curl \
-        --fail \
+    fatal_curl \
+        "Could not retrieve custom Chalk profile component." \
+        -- \
+        "$component_url" \
         --show-error \
         --silent \
         --location \
-        "$component_url" \
-        > "$component" \
-        || (
-            error Could not retrieve custom Chalk profile component.
-            fatal "$(cat "$component")"
-        )
-    curl \
-        --fail \
+        --output "$component"
+    fatal_curl \
+        "Could not retrieve custom Chalk profile component parameters." \
+        -- \
+        "$parameters_url" \
         --show-error \
         --silent \
         --location \
         --header 'Accept: application/json' \
-        "$parameters_url" \
-        > "$parameters" \
-        || (
-            error Could not retrieve custom Chalk profile component parameters.
-            fatal "$(cat "$parameters")"
-        )
+        --output "$parameters"
     params=- load_config "$component" < "$parameters"
     if [ -z "$saas" ] && [ "$run_setup" = "true" ]; then
         info "Setting up CrashOverride Chalk attestation"
@@ -624,7 +727,14 @@ get_chalk_version() {
 # find out latest chalk version
 set_latest_version() {
     info Querying latest version of chalk
-    version=$(curl -fsSL "$latest_version_url")
+    result=$(mktemp latest_version.XXXXXX)
+    fatal_curl \
+        "Could not query latest chalk version from $latest_version_url" \
+        -- \
+        "$latest_version_url" \
+        -sSL \
+        --output "$result"
+    version=$(tr -d '\r\n' < "$result")
     info Latest version is "$version"
 }
 
@@ -660,24 +770,22 @@ download_chalk() {
     url=$URL_PREFIX/$(chalk_folder)/$name
     info Downloading Chalk from "$url"
     rm -f "$TMP/$name" "$TMP/$name.sha256"
-    curl \
-        --fail \
+    fatal_curl \
+        "Could not download $name. Are you sure this is a valid version?" \
+        -- \
+        "$url" \
         --show-error \
         --silent \
         --location \
-        --output "$TMP/$name" \
-        "$url" || (
-        fatal Could not download "$name". Are you sure this is a valid version?
-    )
-    curl \
-        --fail \
+        --output "$TMP/$name"
+    fatal_curl \
+        "Could not download checksum to validate $name integrity" \
+        -- \
+        "$url.sha256" \
         --show-error \
         --silent \
         --location \
-        --output "$TMP/$name.sha256" \
-        "$url.sha256" || (
-        fatal Could not download checksum to validate "$name" integrity
-    )
+        --output "$TMP/$name.sha256"
     if ! [ -f "$chalk_tmp" ]; then
         return 1
     fi
@@ -884,6 +992,11 @@ EOF
     exit "${1:-0}"
 }
 
+# has_value succeeds (returns 0) when the next positional token "$1" is a real
+# value rather than another flag. A leading "--" means "$1" is the next flag
+# (so the current flag has no value of its own); no args left likewise means no
+# value. Pass 1 below uses `! has_value` to append an empty placeholder value
+# after any "--flag" that was given without one.
 has_value() {
     if [ $# -eq 0 ]; then
         return 1
@@ -898,38 +1011,69 @@ has_value() {
     esac
 }
 
+# Pass 1 of 2: normalize every argument into a fixed "<flag> <value>" 2-token
+# shape. All of these spellings
+#     --version=1   --version 1   --version= 1   --version =1   --version = 1
+# are rewritten to exactly two tokens: "--version" "1". A "--flag" given with no
+# value (bare --version, or a value-less flag like --connect/--saas) is rewritten
+# to "--flag" "" -- an empty placeholder value is always appended so that Pass 2
+# can unconditionally consume a value token for every long flag. Args are rotated
+# in place: `shift` drops the original token off the front and `set -- "$@" ...`
+# appends the normalized token(s) to the back, so after $# iterations only
+# normalized tokens remain. Single-dash flags (-vv, -h) take no value and are NOT
+# normalized -- they pass through unchanged via the *) arm as a single token.
 for arg; do
     shift
     case "$arg" in
+        # bare "=" (from "--flag = value"): the "=" arrived as its own token, so
+        # drop it, appending a placeholder if no real value follows.
         =)
             if ! has_value "$@"; then
                 set -- "$@" ""
             fi
             ;;
+        # "--flag=" (trailing "="; from "--flag= value"): emit the flag, then a
+        # real value if one follows else an empty placeholder.
         --*=)
             set -- "$@" "${arg%%=*}"
             if ! has_value "$@"; then
                 set -- "$@" ""
             fi
             ;;
+        # "=value" (from "--flag =value"): emit just the value; the flag itself
+        # was emitted when the preceding "--flag" token matched the --*) arm.
         =*)
             set -- "$@" "${arg#*=}"
             ;;
+        # "--flag=value": split the single token into flag and value.
         --*=*)
             set -- "$@" "${arg%%=*}" "${arg#*=}"
             ;;
+        # "--flag" (no "="): emit the flag, then a real value if the next token
+        # is one else an empty placeholder.
         --*)
             set -- "$@" "$arg"
             if ! has_value "$@"; then
                 set -- "$@" ""
             fi
             ;;
+        # positional or single-dash token (e.g. -vv, -h): pass through unchanged.
         *)
             set -- "$@" "$arg"
             ;;
     esac
 done
 
+# Pass 2 of 2: consume the normalized tokens. Because Pass 1 guaranteed every
+# long "--flag" is followed by exactly one value token (a real value or the ""
+# placeholder), each --flag consumes TWO tokens per iteration:
+#   * the `shift; n=$((n - 1))` just below consumes the flag token (into $arg);
+#   * the first `case "$arg"` reads that flag's value from $1 WITHOUT shifting;
+#   * the trailing `case "$arg" in --*)` at the bottom of the loop consumes the
+#     value token with a SECOND `shift; n=$((n - 1))`.
+# Single-dash flags (-vv, -h) have no value token, do not match that trailing
+# --*) arm, and so consume only one token. The two shift sites must stay in
+# sync: the flag token is dropped at the top, its value token at the bottom.
 n=$#
 while [ "$n" -gt 0 ]; do
     arg=${1:-}
@@ -955,10 +1099,10 @@ while [ "$n" -gt 0 ]; do
             profile=${1:-$profile}
             ;;
         --token)
-            token=$(echo "$1" | tr -d '\n')
+            token=$(echo "$1" | tr -d '\r\n')
             ;;
         --oidc)
-            oidc=$(echo "$1" | tr -d '\n')
+            oidc=$(echo "$1" | tr -d '\r\n')
             connect=true
             ;;
         --params)
@@ -992,7 +1136,7 @@ while [ "$n" -gt 0 ]; do
         --config-replace)
             config_replace=true
             ;;
-        --no-config_replace)
+        --no-config-replace)
             config_replace=
             ;;
         --copy-from)
@@ -1022,6 +1166,9 @@ while [ "$n" -gt 0 ]; do
             help 1
             ;;
     esac
+    # Consume the value token that Pass 1 guaranteed follows every long "--flag"
+    # (its real value, or the "" placeholder). This is the second of the two
+    # tokens each --flag consumes -- see the Pass 2 header comment above.
     case "$arg" in
         --*)
             n=$((n - 1))

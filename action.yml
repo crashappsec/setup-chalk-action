@@ -99,20 +99,33 @@ runs:
     - name: Hide provided JWT token
       if: env.__CHALK_ALREADY_SETUP__ == '' && inputs.token != ''
       shell: sh
+      env:
+        INPUT_TOKEN: ${{ inputs.token }}
       run: |
-        echo "::add-mask::${{ inputs.token }}"
+        echo "::add-mask::$INPUT_TOKEN"
 
     - name: Hide provided password
       if: env.__CHALK_ALREADY_SETUP__ == '' && inputs.password != ''
       shell: sh
+      env:
+        INPUT_PASSWORD: ${{ inputs.password }}
       run: |
-        echo "::add-mask::${{ inputs.password }}"
+        echo "::add-mask::$INPUT_PASSWORD"
 
     - name: Set CHALK_PASSWORD
       if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && inputs.password != ''
       shell: sh
+      env:
+        INPUT_PASSWORD: ${{ inputs.password }}
       run: |
-        echo "CHALK_PASSWORD=${{ inputs.password }}" >> $GITHUB_ENV
+        # Write the (possibly multiline) value through a random heredoc
+        # delimiter so a crafted password cannot inject extra $GITHUB_ENV keys.
+        delimiter="CHALK_PASSWORD_EOF_$(od -An -tx1 -N16 /dev/urandom | tr -d ' \n')"
+        {
+          printf '%s<<%s\n' CHALK_PASSWORD "$delimiter"
+          printf '%s\n' "$INPUT_PASSWORD"
+          printf '%s\n' "$delimiter"
+        } >> $GITHUB_ENV
 
     - name: Save Public Key
       if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && inputs.public_key != ''
@@ -151,36 +164,41 @@ runs:
       id: chalk
       if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS')
       shell: sh
-      run: |
-        ${{ steps.action_path.outputs.value }}/setup.sh \
-          --version='${{ inputs.version }}' \
-          --latest-version-url='${{ inputs.latest_version_url }}' \
-          --load='${{ inputs.load }}' \
-          --params='${{ inputs.params }}' \
-          --token='${{ inputs.token }}' \
-          --profile='${{ inputs.profile }}' \
-          ${{ inputs.connect == 'true' && '--connect' || '' }} \
-          ${{ inputs.public_key != '' && format('--public-key={0}/chalk.pub', env.CHALK_TMP) || '' }} \
-          ${{ inputs.private_key != '' && format('--private-key={0}/chalk.key', env.CHALK_TMP) || '' }} \
-          ${{ runner.debug == '1' && '--debug' || '' }}
+      # setup.sh reads every parameter from a CHALK_* env var, so pass the
+      # inputs as environment data instead of splicing them into the command
+      # line. This keeps the run block free of any ${{ }} interpolation and so
+      # closes the shell/CLI injection surface entirely.
       env:
         CHALK_OBSERVABLES_VERSION: ${{ inputs.observables_version }}
+        CHALK_VERSION: ${{ inputs.version }}
+        CHALK_LATEST_VERSION_URL: ${{ inputs.latest_version_url }}
+        CHALK_LOAD: ${{ inputs.load }}
+        CHALK_PARAMS: ${{ inputs.params }}
+        CHALK_TOKEN: ${{ inputs.token }}
+        CHALK_PROFILE: ${{ inputs.profile }}
+        CHALK_CONNECT: ${{ inputs.connect == 'true' && 'true' || '' }}
+        CHALK_DEBUG: ${{ runner.debug == '1' && 'true' || '' }}
+        CHALK_PUBLIC_KEY: ${{ inputs.public_key != '' && format('{0}/chalk.pub', env.CHALK_TMP) || '' }}
+        CHALK_PRIVATE_KEY: ${{ inputs.private_key != '' && format('{0}/chalk.key', env.CHALK_TMP) || '' }}
+        ACTION_PATH: ${{ steps.action_path.outputs.value }}
+      run: |
+        "$ACTION_PATH/setup.sh"
 
     - name: Cleanup Public Key
-      if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && inputs.public_key != ''
+      if: always() && env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && inputs.public_key != ''
       shell: sh
       env:
         CHALK_PUBLIC_KEY: "${{ inputs.public_key }}"
       run: |
-        rm "$CHALK_TMP/chalk.pub"
+        rm -f "$CHALK_TMP/chalk.pub"
 
     - name: Cleanup Private Key
-      if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && inputs.private_key != ''
+      if: always() && env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && inputs.private_key != ''
       shell: sh
       env:
         CHALK_PRIVATE_KEY: "${{ inputs.private_key }}"
       run: |
-        rm "$CHALK_TMP/chalk.key"
+        rm -f "$CHALK_TMP/chalk.key"
 
     # github doesnt support using inputs for the action version
     # so we template inline action
