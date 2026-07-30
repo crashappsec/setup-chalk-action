@@ -386,7 +386,7 @@ else
             fi
             if is_installed git; then
                 if [ -n "${GITHUB_ACTION_PATH:-}" ]; then
-                    _CURL_UA_BASE="$_CURL_UA_BASE setup-chalk-action-commit/$(git -C "$GITHUB_ACTION_PATH" --no-pager log -n1 --pretty=format:%H 2> /dev/null)"
+                    _CURL_UA_BASE="$_CURL_UA_BASE setup-chalk-action-commit/$(git -c safe.directory="$GITHUB_ACTION_PATH" -C "$GITHUB_ACTION_PATH" --no-pager log -n1 --pretty=format:%H 2> /dev/null)"
                 else
                     case "$0" in
                         *.sh)
