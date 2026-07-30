@@ -384,24 +384,25 @@ else
             else
                 _CURL_UA_BASE="curl"
             fi
-            if is_installed git; then
-                if [ -n "${GITHUB_ACTION_PATH:-}" ]; then
+            if [ -n "${GITHUB_ACTION_PATH:-}" ]; then
+                _CURL_UA_BASE="$_CURL_UA_BASE setup-chalk-action-ref/$(basename "$GITHUB_ACTION_PATH")"
+                if is_installed git; then
                     _commit=$(git -c safe.directory="$GITHUB_ACTION_PATH" -C "$GITHUB_ACTION_PATH" --no-pager log -n1 --pretty=format:%H 2> /dev/null)
                     if [ -n "$_commit" ]; then
                         _CURL_UA_BASE="$_CURL_UA_BASE setup-chalk-action-commit/$_commit"
                     fi
-                else
-                    case "$0" in
-                        *.sh)
-                            if git -C "$(dirname "$0")" ls-files --error-unmatch "$0" > /dev/null 2>&1; then
-                                _commit=$(git -C "$(dirname "$0")" --no-pager log -n1 --pretty=format:%H 2> /dev/null)
-                                if [ -n "$_commit" ]; then
-                                    _CURL_UA_BASE="$_CURL_UA_BASE setup-chalk-action-commit/$_commit"
-                                fi
-                            fi
-                            ;;
-                    esac
                 fi
+            elif is_installed git; then
+                case "$0" in
+                    *.sh)
+                        if git -C "$(dirname "$0")" ls-files --error-unmatch "$0" > /dev/null 2>&1; then
+                            _commit=$(git -C "$(dirname "$0")" --no-pager log -n1 --pretty=format:%H 2> /dev/null)
+                            if [ -n "$_commit" ]; then
+                                _CURL_UA_BASE="$_CURL_UA_BASE setup-chalk-action-commit/$_commit"
+                            fi
+                        fi
+                        ;;
+                esac
             fi
             case "$0" in
                 *.sh)
