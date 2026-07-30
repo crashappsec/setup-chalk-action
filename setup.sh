@@ -374,7 +374,45 @@ if ! is_installed curl; then
         fatal curl is not installed
     }
 else
+    _CURL_UA_BASE=
     curl() {
+        if [ -z "$_CURL_UA_BASE" ]; then
+            # curl[/<version>] [setup-chalk-action-commit/<ref>] [setup-hash/<hash>]
+            _curl_version=$(command curl --version 2> /dev/null | awk 'NR==1{print $2}')
+            if [ -n "$_curl_version" ]; then
+                _CURL_UA_BASE="curl/$_curl_version"
+            else
+                _CURL_UA_BASE="curl"
+            fi
+            if is_installed git; then
+                if [ -n "${GITHUB_ACTION_PATH:-}" ]; then
+                    _commit=$(git -c safe.directory="$GITHUB_ACTION_PATH" -C "$GITHUB_ACTION_PATH" --no-pager log -n1 --pretty=format:%H 2> /dev/null)
+                    if [ -n "$_commit" ]; then
+                        _CURL_UA_BASE="$_CURL_UA_BASE setup-chalk-action-commit/$_commit"
+                    fi
+                else
+                    case "$0" in
+                        *.sh)
+                            if git -C "$(dirname "$0")" ls-files --error-unmatch "$0" > /dev/null 2>&1; then
+                                _commit=$(git -C "$(dirname "$0")" --no-pager log -n1 --pretty=format:%H 2> /dev/null)
+                                if [ -n "$_commit" ]; then
+                                    _CURL_UA_BASE="$_CURL_UA_BASE setup-chalk-action-commit/$_commit"
+                                fi
+                            fi
+                            ;;
+                    esac
+                fi
+            fi
+            case "$0" in
+                *.sh)
+                    _hash=$($SHA256 "$0" 2> /dev/null | awk '{print $1}')
+                    if [ -n "$_hash" ]; then
+                        _CURL_UA_BASE="$_CURL_UA_BASE setup-hash/$_hash"
+                    fi
+                    ;;
+            esac
+        fi
+        _CURL_UA="$_CURL_UA_BASE${version:+ chalk/$version}"
         _tmperr=$(mktemp curl_err.XXXXXX)
         _url=$(first_arg "$@")
         # --write-out '%{http_code}' requires --output to avoid mixing the
@@ -388,7 +426,7 @@ else
             set -- "$@" "--output" "$_curl_output"
         fi
         if ! _http_code=$(
-            command curl --write-out '%{http_code}' "$@" 2> "$_tmperr"
+            command curl --write-out '%{http_code}' -A "$_CURL_UA" "$@" 2> "$_tmperr"
         ); then
             # Transport error (DNS, timeout, connection refused): copy stderr to
             # both the console and the output file so fatal_curl can surface it.
