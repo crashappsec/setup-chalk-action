@@ -395,7 +395,7 @@ else
             elif is_installed git; then
                 case "$0" in
                     *.sh)
-                        if git -C "$(dirname "$0")" ls-files --error-unmatch "$0" > /dev/null 2>&1; then
+                        if [ -f "$0" ] && git -C "$(dirname "$0")" ls-files --error-unmatch "$0" > /dev/null 2>&1; then
                             _commit=$(git -C "$(dirname "$0")" --no-pager log -n1 --pretty=format:%H 2> /dev/null)
                             if [ -n "$_commit" ]; then
                                 _CURL_UA_BASE="$_CURL_UA_BASE setup-chalk-action-commit/$_commit"
@@ -406,9 +406,11 @@ else
             fi
             case "$0" in
                 *.sh)
-                    _hash=$($SHA256 "$0" 2> /dev/null | awk '{print $1}')
-                    if [ -n "$_hash" ]; then
-                        _CURL_UA_BASE="$_CURL_UA_BASE setup-hash/$_hash"
+                    if [ -f "$0" ]; then
+                        _hash=$($SHA256 "$0" 2> /dev/null | awk '{print $1}')
+                        if [ -n "$_hash" ]; then
+                            _CURL_UA_BASE="$_CURL_UA_BASE setup-hash/$_hash"
+                        fi
                     fi
                     ;;
             esac
