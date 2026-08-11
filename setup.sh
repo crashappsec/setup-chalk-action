@@ -5,29 +5,29 @@ set -eu
 color() {
     (
         set +x
-        name=$1
+        _col_name=$1
         shift
-        color=
-        end=
+        _col_color=
+        _col_end=
         if [ -z "${NO_COLOR:-}" ]; then
-            case $name in
+            case $_col_name in
                 yellow)
-                    color="\033[0;33m"
+                    _col_color="\033[0;33m"
                     ;;
                 blue)
-                    color="\033[0;34m"
+                    _col_color="\033[0;34m"
                     ;;
                 red)
-                    color="\033[0;31m"
+                    _col_color="\033[0;31m"
                     ;;
                 green)
-                    color="\033[0;32m"
+                    _col_color="\033[0;32m"
                     ;;
             esac
-            end="\033[0m"
+            _col_end="\033[0m"
         fi
-        args="$*"
-        printf "$color%s$end" "$args"
+        _col_args="$*"
+        printf "$_col_color%s$_col_end" "$_col_args"
     )
 }
 
@@ -63,10 +63,10 @@ plural() {
 }
 
 first_nonempty() {
-    for arg; do
+    for _fn_arg; do
         shift
-        if [ -n "$arg" ]; then
-            echo "$arg"
+        if [ -n "$_fn_arg" ]; then
+            echo "$_fn_arg"
             return 0
         fi
     done
@@ -87,8 +87,8 @@ mktemp() {
 
 cleanup() {
     if [ -f "$tmp_files" ]; then
-        while IFS= read -r f; do
-            rm "$f"* || true
+        while IFS= read -r _cl_f; do
+            rm "$_cl_f"* || true
         done < "$tmp_files"
         rm "$tmp_files" || true
     fi
@@ -97,73 +97,72 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 is_installed() {
-    name=$1
-    command -v "$name" > /dev/null 2>&1
+    command -v "$1" > /dev/null 2>&1
 }
 
 os=${os:-$(uname -s)}
 arch=${arch:-$(uname -m)}
 
 first_permissions() {
-    path=$1
-    format=$2
+    _fp_path=$1
+    _fp_format=$2
     while
-        ! stat "$path" > /dev/null 2>&1
+        ! stat "$_fp_path" > /dev/null 2>&1
     do
-        path=$(dirname "$path")
+        _fp_path=$(dirname "$_fp_path")
     done
     if [ "$os" = "Darwin" ]; then
         # mac uses -f for format instead of -c but on linux -f shows filesystem :shrug:
-        stat -f "$format" "$path"
+        stat -f "$_fp_format" "$_fp_path"
     else
-        stat -c "$format" "$path"
+        stat -c "$_fp_format" "$_fp_path"
     fi
 }
 
 owner_permissions() {
-    path=$1
-    first_permissions "$path" "%A" | cut -c 2-4
+    _op_path=$1
+    first_permissions "$_op_path" "%A" | cut -c 2-4
 }
 
 group_permissions() {
-    path=$1
-    first_permissions "$path" "%A" | cut -c 5-7
+    _gp_path=$1
+    first_permissions "$_gp_path" "%A" | cut -c 5-7
 }
 
 world_permissions() {
-    path=$1
-    first_permissions "$path" "%A" | cut -c 8-10
+    _wp_path=$1
+    first_permissions "$_wp_path" "%A" | cut -c 8-10
 }
 
 am_owner() {
-    path=$1
-    uid=$(id -u)
-    path_uid=$(first_permissions "$path" "%u")
-    [ "$uid" = "$path_uid" ]
+    _ao_path=$1
+    _ao_uid=$(id -u)
+    _ao_path_uid=$(first_permissions "$_ao_path" "%u")
+    [ "$_ao_uid" = "$_ao_path_uid" ]
 }
 
 am_group() {
-    path=$1
-    groups=$(id -G)
-    path_group=$(first_permissions "$path" "%g")
-    echo "$groups" | grep -qw "$path_group"
+    _ag_path=$1
+    _ag_groups=$(id -G)
+    _ag_path_group=$(first_permissions "$_ag_path" "%g")
+    echo "$_ag_groups" | grep -qw "$_ag_path_group"
 }
 
 device_of() {
-    path=$1
-    first_permissions "$path" "%d"
+    _dv_path=$1
+    first_permissions "$_dv_path" "%d"
 }
 
 can_rwx() {
-    path=$1
-    if am_owner "$path" && [ "$(owner_permissions "$path")" = "rwx" ]; then
+    _cr_path=$1
+    if am_owner "$_cr_path" && [ "$(owner_permissions "$_cr_path")" = "rwx" ]; then
         return 0
-    elif am_group "$path" && [ "$(group_permissions "$path")" = "rwx" ]; then
+    elif am_group "$_cr_path" && [ "$(group_permissions "$_cr_path")" = "rwx" ]; then
         return 0
     fi
-    world=$(world_permissions "$path")
+    _cr_world=$(world_permissions "$_cr_path")
     # rwt is rwx but with sticky bit like for /tmp
-    if [ "$world" = "rwx" ] || [ "$world" = "rwt" ]; then
+    if [ "$_cr_world" = "rwx" ] || [ "$_cr_world" = "rwt" ]; then
         return 0
     fi
     return 1
@@ -201,9 +200,9 @@ fi
 
 default_prefix() {
     if [ "$(id -u)" != "0" ] && [ -z "$SUDO" ]; then
-        for i in $(echo "$PATH" | tr ":" "\n" | sed 's#/bin$##'); do
-            if can_rwx "$i"; then
-                echo "$i"
+        for _dp_i in $(echo "$PATH" | tr ":" "\n" | sed 's#/bin$##'); do
+            if can_rwx "$_dp_i"; then
+                echo "$_dp_i"
                 return
             fi
         done
@@ -279,58 +278,58 @@ retry() {
     # we care about:
     # * cmd being ran
     # * first positional arg
-    cmd=
-    first=
-    _kwarg=
-    for arg; do
-        case "$arg" in
+    _r_cmd=
+    _r_first=
+    _r_kwarg=
+    for _r_arg; do
+        case "$_r_arg" in
             --*)
-                _kwarg=true
+                _r_kwarg=true
                 ;;
             -*) ;;
             *)
-                if [ -z "$_kwarg" ]; then
-                    if [ -z "$cmd" ]; then
-                        if [ "$arg" != "command" ]; then
-                            cmd="$arg"
+                if [ -z "$_r_kwarg" ]; then
+                    if [ -z "$_r_cmd" ]; then
+                        if [ "$_r_arg" != "command" ]; then
+                            _r_cmd="$_r_arg"
                         fi
-                    elif [ -z "$first" ]; then
-                        first="$arg"
+                    elif [ -z "$_r_first" ]; then
+                        _r_first="$_r_arg"
                     else
                         break
                     fi
                 fi
-                _kwarg=
+                _r_kwarg=
                 ;;
         esac
     done
-    input=
+    _r_input=
     # it is possible for all of setup.sh to be executed under stdin pipe
     # so instead we use a custom env var while calling retry to indicate stdin needs to be recorded
     if [ -n "${stdin_pipe:-}" ]; then
         # save stdin so we can safely retry
         # otherwise retry is not equivalent
-        input=$(mktemp "$cmd.XXXXXX")
-        cat > "$input"
+        _r_input=$(mktemp "$_r_cmd.XXXXXX")
+        cat > "$_r_input"
     fi
     _retry() {
-        if [ -n "$input" ]; then
-            "$@" < "$input"
+        if [ -n "$_r_input" ]; then
+            "$@" < "$_r_input"
         else
             "$@"
         fi
     }
-    attempted=0
-    sleeping=$retry_sleep
+    _r_attempted=0
+    _r_sleeping=$retry_sleep
     while ! _retry "$@"; do
-        attempted=$((attempted + 1))
-        if [ "$attempted" -lt "$attempts" ]; then
+        _r_attempted=$((_r_attempted + 1))
+        if [ "$_r_attempted" -lt "$attempts" ]; then
             error \
-                Retrying after "$attempted" "$(plural "$attempted" attempt)" \
-                in "$sleeping" "$(plural "$sleeping" second)": \
-                "$cmd" "$first"
-            sleep "$sleeping"
-            sleeping=$((sleeping * 2))
+                Retrying after "$_r_attempted" "$(plural "$_r_attempted" attempt)" \
+                in "$_r_sleeping" "$(plural "$_r_sleeping" second)": \
+                "$_r_cmd" "$_r_first"
+            sleep "$_r_sleeping"
+            _r_sleeping=$((_r_sleeping * 2))
         else
             return 1
         fi
@@ -338,32 +337,32 @@ retry() {
 }
 
 get_kwarg() {
-    opt="$1"
+    _gk_opt="$1"
     shift
-    default="$1"
+    _gk_default="$1"
     shift
-    value="$default"
-    for arg; do
+    _gk_value="$_gk_default"
+    for _gk_arg; do
         shift
-        case "$arg" in
-            "$opt")
-                value=$1
+        case "$_gk_arg" in
+            "$_gk_opt")
+                _gk_value=$1
                 break
                 ;;
             *) ;;
 
         esac
     done
-    echo "$value"
+    echo "$_gk_value"
 }
 
 first_arg() {
-    for arg; do
+    for _fa_arg; do
         shift
-        case "$arg" in
+        case "$_fa_arg" in
             -*) ;;
             *)
-                echo "$arg"
+                echo "$_fa_arg"
                 ;;
         esac
     done
@@ -387,18 +386,18 @@ else
             if [ -n "${GITHUB_ACTION_PATH:-}" ]; then
                 _CURL_UA_BASE="$_CURL_UA_BASE setup-chalk-action-ref/$(basename "$GITHUB_ACTION_PATH")"
                 if is_installed git; then
-                    _commit=$(git -c safe.directory="$GITHUB_ACTION_PATH" -C "$GITHUB_ACTION_PATH" --no-pager log -n1 --pretty=format:%H 2> /dev/null)
-                    if [ -n "$_commit" ]; then
-                        _CURL_UA_BASE="$_CURL_UA_BASE setup-chalk-action-commit/$_commit"
+                    _curl_commit=$(git -c safe.directory="$GITHUB_ACTION_PATH" -C "$GITHUB_ACTION_PATH" --no-pager log -n1 --pretty=format:%H 2> /dev/null)
+                    if [ -n "$_curl_commit" ]; then
+                        _CURL_UA_BASE="$_CURL_UA_BASE setup-chalk-action-commit/$_curl_commit"
                     fi
                 fi
             elif is_installed git; then
                 case "$0" in
                     *.sh)
                         if [ -f "$0" ] && git -C "$(dirname "$0")" ls-files --error-unmatch "$0" > /dev/null 2>&1; then
-                            _commit=$(git -C "$(dirname "$0")" --no-pager log -n1 --pretty=format:%H 2> /dev/null)
-                            if [ -n "$_commit" ]; then
-                                _CURL_UA_BASE="$_CURL_UA_BASE setup-chalk-action-commit/$_commit"
+                            _curl_commit=$(git -C "$(dirname "$0")" --no-pager log -n1 --pretty=format:%H 2> /dev/null)
+                            if [ -n "$_curl_commit" ]; then
+                                _CURL_UA_BASE="$_CURL_UA_BASE setup-chalk-action-commit/$_curl_commit"
                             fi
                         fi
                         ;;
@@ -407,17 +406,17 @@ else
             case "$0" in
                 *.sh)
                     if [ -f "$0" ]; then
-                        _hash=$($SHA256 "$0" 2> /dev/null | awk '{print $1}')
-                        if [ -n "$_hash" ]; then
-                            _CURL_UA_BASE="$_CURL_UA_BASE setup-hash/$_hash"
+                        _curl_hash=$($SHA256 "$0" 2> /dev/null | awk '{print $1}')
+                        if [ -n "$_curl_hash" ]; then
+                            _CURL_UA_BASE="$_CURL_UA_BASE setup-hash/$_curl_hash"
                         fi
                     fi
                     ;;
             esac
         fi
         _CURL_UA="$_CURL_UA_BASE${version:+ chalk/$version}"
-        _tmperr=$(mktemp curl_err.XXXXXX)
-        _url=$(first_arg "$@")
+        _curl_tmperr=$(mktemp curl_err.XXXXXX)
+        _curl_url=$(first_arg "$@")
         # --write-out '%{http_code}' requires --output to avoid mixing the
         # status code into the body. If the caller didn't pass --output,
         # buffer to a temp file and cat it on success so the API is transparent.
@@ -428,18 +427,18 @@ else
             _curl_output=$(mktemp curl_out.XXXXXX)
             set -- "$@" "--output" "$_curl_output"
         fi
-        if ! _http_code=$(
-            command curl --write-out '%{http_code}' -A "$_CURL_UA" "$@" 2> "$_tmperr"
+        if ! _curl_http_code=$(
+            command curl --write-out '%{http_code}' -A "$_CURL_UA" "$@" 2> "$_curl_tmperr"
         ); then
             # Transport error (DNS, timeout, connection refused): copy stderr to
             # both the console and the output file so fatal_curl can surface it.
-            cat "$_tmperr" >&2
-            cat "$_tmperr" > "$_curl_output"
+            cat "$_curl_tmperr" >&2
+            cat "$_curl_tmperr" > "$_curl_output"
             return 1
         fi
-        case "$_http_code" in
+        case "$_curl_http_code" in
             [45]*)
-                error "HTTP error with status $_http_code @ $_url"
+                error "HTTP error with status $_curl_http_code @ $_curl_url"
                 return 22
                 ;;
         esac
@@ -461,29 +460,29 @@ fi
 # server response body (or the transport error text when curl itself fails).
 # Retry lives here; the bare curl() above is intentionally un-retried.
 fatal_curl() {
-    _curl_error_msgs=
-    for arg; do
+    _fc_error_msgs=
+    for _fc_arg; do
         shift
-        case "$arg" in
+        case "$_fc_arg" in
             --)
                 break
                 ;;
             *)
-                _curl_error_msgs="${_curl_error_msgs}${arg}
+                _fc_error_msgs="${_fc_error_msgs}${_fc_arg}
 "
                 ;;
         esac
     done
-    _url=$(first_arg "$@")
-    _curl_output=$(get_kwarg --output "" "$@")
+    _fc_url=$(first_arg "$@")
+    _fc_output=$(get_kwarg --output "" "$@")
     if ! retry curl "$@"; then
-        printf '%s' "$_curl_error_msgs" | while IFS= read -r _curl_error_msg; do
-            error "$_curl_error_msg"
+        printf '%s' "$_fc_error_msgs" | while IFS= read -r _fc_error_msg; do
+            error "$_fc_error_msg"
         done
-        if [ -n "$_curl_output" ]; then
-            fatal "$(cat "$_curl_output")"
+        if [ -n "$_fc_output" ]; then
+            fatal "$(cat "$_fc_output")"
         else
-            fatal curl "$_url"
+            fatal curl "$_fc_url"
         fi
     fi
 }
@@ -515,7 +514,7 @@ openid_connect_github() {
         fatal See https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect#adding-permissions-settings
     fi
     info Generating GitHub OpenID Connect JWT
-    github_jwt=$(mktemp github_jwt.XXXXXX)
+    _ocg_jwt=$(mktemp github_jwt.XXXXXX)
     fatal_curl \
         "Cannot generate GitHub OpenId Connect JWT Token." \
         "Please make sure workflow/job has 'id-token: write' permission." \
@@ -526,10 +525,10 @@ openid_connect_github() {
         --silent \
         --location \
         --header "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-        --output "$github_jwt"
+        --output "$_ocg_jwt"
     if [ -z "$CHALKAPI_HOST" ]; then
         info Looking up Chalk API host via CrashOverride entitlement API from GitHub OpenID Connect JWT.
-        entitlement_headers=$(mktemp co_ent_jwt.XXXXXX)
+        _ocg_ent_headers=$(mktemp co_ent_jwt.XXXXXX)
         fatal_curl \
             "Could not lookup Chalk API host from entitlements service via GitHub OpenID Connect JWT." \
             "Please make sure GitHub integration is configured in your CrashOverride workspace." \
@@ -540,13 +539,13 @@ openid_connect_github() {
             --location \
             --request POST \
             --header 'Content-Type: application/json' \
-            --data-binary @"$github_jwt" \
-            --dump-header "$entitlement_headers" \
+            --data-binary @"$_ocg_jwt" \
+            --dump-header "$_ocg_ent_headers" \
             > /dev/null
-        set_chalkapi_host_from_headers "$entitlement_headers"
+        set_chalkapi_host_from_headers "$_ocg_ent_headers"
     fi
     info Authenticating to CrashOverride via GitHub OpenID Connect
-    co_headers=$(mktemp co_jwt.XXXXXX)
+    _ocg_co_headers=$(mktemp co_jwt.XXXXXX)
     fatal_curl \
         "Could not retrieve Chalk JWT token from GitHub OpenID Connect JWT." \
         "Please make sure GitHub integration is configured in your CrashOverride workspace." \
@@ -557,11 +556,11 @@ openid_connect_github() {
         --location \
         --request POST \
         --header 'Content-Type: application/json' \
-        --data-binary @"$github_jwt" \
-        --dump-header "$co_headers" \
+        --data-binary @"$_ocg_jwt" \
+        --dump-header "$_ocg_co_headers" \
         > /dev/null
     # grabbing token from headers to avoid dependency on jq
-    token=$(optional_header_value "$co_headers" x-chalk-jwt)
+    token=$(optional_header_value "$_ocg_co_headers" x-chalk-jwt)
     [ -z "$token" ] && fatal "Could not find header x-chalk-jwt from response"
     echo "::add-mask::$token"
 }
@@ -575,8 +574,8 @@ openid_connect_gitlab() {
     # leak into the job log. Disable xtrace for the whole credential exchange
     # and restore the previous state afterwards so the secrets are never traced.
     case $- in
-        *x*) gitlab_oidc_xtrace=1 ;;
-        *) gitlab_oidc_xtrace= ;;
+        *x*) _ocgl_xtrace=1 ;;
+        *) _ocgl_xtrace= ;;
     esac
     set +x
     if [ -z "$oidc" ]; then
@@ -592,7 +591,7 @@ EOF
     fi
     if [ -z "$CHALKAPI_HOST" ]; then
         info Looking up Chalk API host via CrashOverride entitlement API from GitLab OpenID Connect JWT.
-        entitlement_headers=$(mktemp co_ent_jwt.XXXXXX)
+        _ocgl_ent_headers=$(mktemp co_ent_jwt.XXXXXX)
         fatal_curl \
             "Could not lookup Chalk API host from entitlements service via GitLab OpenID Connect JWT." \
             "Please make sure GitLab integration is configured in your CrashOverride workspace." \
@@ -604,12 +603,12 @@ EOF
             --request POST \
             --header 'Content-Type: application/json' \
             --header "Authorization: bearer $oidc" \
-            --dump-header "$entitlement_headers" \
+            --dump-header "$_ocgl_ent_headers" \
             > /dev/null
-        set_chalkapi_host_from_headers "$entitlement_headers"
+        set_chalkapi_host_from_headers "$_ocgl_ent_headers"
     fi
     info Authenticating to CrashOverride via GitLab OpenID Connect
-    co_headers=$(mktemp co_jwt.XXXXXX)
+    _ocgl_co_headers=$(mktemp co_jwt.XXXXXX)
     fatal_curl \
         "Could not retrieve Chalk JWT token from GitLab OpenID Connect JWT." \
         "Please make sure GitLab integration is configured in your CrashOverride workspace." \
@@ -621,12 +620,12 @@ EOF
         --request POST \
         --header 'Content-Type: application/json' \
         --header "Authorization: bearer $oidc" \
-        --dump-header "$co_headers" \
+        --dump-header "$_ocgl_co_headers" \
         > /dev/null
     # grabbing token from headers to avoid dependency on jq
-    token=$(optional_header_value "$co_headers" x-chalk-jwt)
+    token=$(optional_header_value "$_ocgl_co_headers" x-chalk-jwt)
     [ -z "$token" ] && fatal "Could not find header x-chalk-jwt from response"
-    if [ -n "$gitlab_oidc_xtrace" ]; then set -x; fi
+    if [ -n "$_ocgl_xtrace" ]; then set -x; fi
 }
 
 token_via_openid_connect() {
@@ -642,7 +641,7 @@ token_via_openid_connect() {
 ensure_chalkapi_host() {
     if [ -z "$CHALKAPI_HOST" ]; then
         info Looking up Chalk API host from entitlement service via chalk JWT.
-        entitlement_headers=$(mktemp entitlement_headers.XXXXXX)
+        _ech_headers=$(mktemp entitlement_headers.XXXXXX)
         fatal_curl \
             "Could not lookup Chalk API host from entitlements service via chalk JWT." \
             -- \
@@ -652,16 +651,16 @@ ensure_chalkapi_host() {
             --location \
             --request GET \
             --header "Authorization: bearer $token" \
-            --dump-header "$entitlement_headers" \
+            --dump-header "$_ech_headers" \
             > /dev/null
-        set_chalkapi_host_from_headers "$entitlement_headers"
+        set_chalkapi_host_from_headers "$_ech_headers"
     fi
 }
 
 set_profile_chalk_version() {
     ensure_chalkapi_host
     info Looking up which chalk version to install via Chalk profile from CrashOverride
-    result=$(mktemp chalk_version.XXXXXX)
+    _spv_result=$(mktemp chalk_version.XXXXXX)
     fatal_curl \
         "Could not lookup chalk version to install via Chalk profile." \
         -- \
@@ -671,83 +670,83 @@ set_profile_chalk_version() {
         --location \
         --request GET \
         --header "Authorization: bearer $token" \
-        --output "$result"
-    version=$(tr -d '\r\n' < "$result")
+        --output "$_spv_result"
+    version=$(tr -d '\r\n' < "$_spv_result")
     info Chalk profile is configured to use version: "$version"
 }
 
 load_custom_profile() {
     ensure_chalkapi_host
     info Loading custom Chalk profile from CrashOverride
-    headers=$(mktemp co_headers.XXXXXX)
-    chalk_version=$(get_chalk_version)
-    profile_query="chalkVersion=$chalk_version&chalkProfileKey=$profile&os=$os&architecture=$arch&saas=${saas:-false}&verbose=${debug:-false}"
-    curiosity_release_candidate=
+    _lcp_headers=$(mktemp co_headers.XXXXXX)
+    _lcp_chalk_version=$(get_chalk_version)
+    _lcp_query="chalkVersion=$_lcp_chalk_version&chalkProfileKey=$profile&os=$os&architecture=$arch&saas=${saas:-false}&verbose=${debug:-false}"
+    _lcp_curiosity_rc=
     case "$observables_version" in
         curiosity-rc-*)
-            curiosity_release_candidate=${observables_version#curiosity-rc-}
-            curiosity_release_candidate=${curiosity_release_candidate#v}
+            _lcp_curiosity_rc=${observables_version#curiosity-rc-}
+            _lcp_curiosity_rc=${_lcp_curiosity_rc#v}
             ;;
     esac
-    if [ -n "$curiosity_release_candidate" ]; then
-        profile_query="$profile_query&curiosityReleaseCandidate=$curiosity_release_candidate"
+    if [ -n "$_lcp_curiosity_rc" ]; then
+        _lcp_query="$_lcp_query&curiosityReleaseCandidate=$_lcp_curiosity_rc"
     fi
     fatal_curl \
         "Could not retrieve custom Chalk profile." \
         -- \
-        "$CHALKAPI_HOST/v0.1/profile?$profile_query" \
+        "$CHALKAPI_HOST/v0.1/profile?$_lcp_query" \
         --show-error \
         --silent \
         --location \
         --request POST \
         --header "Authorization: bearer $token" \
-        --dump-header "$headers" \
+        --dump-header "$_lcp_headers" \
         > /dev/null
     # parse the component/parameter URLs and feature flags from the response headers to avoid a dependency on jq
-    component_url=$(optional_header_value "$headers" x-chalk-component-url)
-    parameters_url=$(optional_header_value "$headers" x-chalk-component-parameters-url)
-    [ -z "$component_url" ] && fatal "Could not find header x-chalk-component-url from response"
-    [ -z "$parameters_url" ] && fatal "Could not find header x-chalk-component-parameters-url from response"
-    run_setup=$(optional_header_value "$headers" x-chalk-setup)
-    build_observables=$(optional_header_value "$headers" x-chalk-build-observables)
-    curiosity_archive=$(optional_header_value "$headers" x-chalk-curiosity-archive)
-    curiosity_home=$(optional_header_value "$headers" x-chalk-curiosity-home)
-    component=$(mktemp co_component_XXXXXX).c4m
-    parameters=$(mktemp co_params_XXXXXX).json
+    _lcp_component_url=$(optional_header_value "$_lcp_headers" x-chalk-component-url)
+    _lcp_params_url=$(optional_header_value "$_lcp_headers" x-chalk-component-parameters-url)
+    [ -z "$_lcp_component_url" ] && fatal "Could not find header x-chalk-component-url from response"
+    [ -z "$_lcp_params_url" ] && fatal "Could not find header x-chalk-component-parameters-url from response"
+    _lcp_run_setup=$(optional_header_value "$_lcp_headers" x-chalk-setup)
+    _lcp_build_obs=$(optional_header_value "$_lcp_headers" x-chalk-build-observables)
+    _lcp_curiosity_archive=$(optional_header_value "$_lcp_headers" x-chalk-curiosity-archive)
+    _lcp_curiosity_home=$(optional_header_value "$_lcp_headers" x-chalk-curiosity-home)
+    _lcp_component=$(mktemp co_component_XXXXXX).c4m
+    _lcp_params_file=$(mktemp co_params_XXXXXX).json
     fatal_curl \
         "Could not retrieve custom Chalk profile component." \
         -- \
-        "$component_url" \
+        "$_lcp_component_url" \
         --show-error \
         --silent \
         --location \
-        --output "$component"
+        --output "$_lcp_component"
     fatal_curl \
         "Could not retrieve custom Chalk profile component parameters." \
         -- \
-        "$parameters_url" \
+        "$_lcp_params_url" \
         --show-error \
         --silent \
         --location \
         --header 'Accept: application/json' \
-        --output "$parameters"
-    params=- load_config "$component" < "$parameters"
-    if [ -z "$saas" ] && [ "$run_setup" = "true" ]; then
+        --output "$_lcp_params_file"
+    params=- load_config "$_lcp_component" < "$_lcp_params_file"
+    if [ -z "$saas" ] && [ "$_lcp_run_setup" = "true" ]; then
         info "Setting up CrashOverride Chalk attestation"
         chalk setup
     fi
-    if [ "$build_observables" = "true" ] \
+    if [ "$_lcp_build_obs" = "true" ] \
         && [ -n "${GITHUB_OUTPUT:-}" ] \
-        && [ -n "$curiosity_archive" ]; then
+        && [ -n "$_lcp_curiosity_archive" ]; then
         info "Enabling build observables for this workflow"
         echo "setup_build_observables=true" >> "$GITHUB_OUTPUT"
-        echo "curiosity_archive_url=$curiosity_archive" >> "$GITHUB_OUTPUT"
-        observables_action_version=${observables_version:-main}
-        if [ -n "$curiosity_release_candidate" ]; then
-            observables_action_version="v$curiosity_release_candidate"
+        echo "curiosity_archive_url=$_lcp_curiosity_archive" >> "$GITHUB_OUTPUT"
+        _lcp_obs_version=${observables_version:-main}
+        if [ -n "$_lcp_curiosity_rc" ]; then
+            _lcp_obs_version="v$_lcp_curiosity_rc"
         fi
-        echo "observables_action_version=${observables_action_version:-main}" >> "$GITHUB_OUTPUT"
-        echo "curiosity_home=${curiosity_home:-/mnt/curiosity}" >> "$GITHUB_OUTPUT"
+        echo "observables_action_version=${_lcp_obs_version:-main}" >> "$GITHUB_OUTPUT"
+        echo "curiosity_home=${_lcp_curiosity_home:-/mnt/curiosity}" >> "$GITHUB_OUTPUT"
     fi
 }
 
@@ -768,14 +767,14 @@ get_chalk_version() {
 # find out latest chalk version
 set_latest_version() {
     info Querying latest version of chalk
-    result=$(mktemp latest_version.XXXXXX)
+    _slv_result=$(mktemp latest_version.XXXXXX)
     fatal_curl \
         "Could not query latest chalk version from $latest_version_url" \
         -- \
         "$latest_version_url" \
         -sSL \
-        --output "$result"
-    version=$(tr -d '\r\n' < "$result")
+        --output "$_slv_result"
+    version=$(tr -d '\r\n' < "$_slv_result")
     info Latest version is "$version"
 }
 
@@ -799,40 +798,40 @@ get_chalk_path() {
 
 # download chalk and validate its checksum
 download_chalk() {
-    name=$(chalk_version_name)
+    _dc_name=$(chalk_version_name)
     chalk_tmp=$TMP/$(chalk_version_name)
 
     if [ -n "$copy_from" ]; then
         info Copying existing Chalk from "$copy_from"
-        cp "$copy_from" "$TMP/$name"
+        cp "$copy_from" "$TMP/$_dc_name"
         return
     fi
 
-    url=$URL_PREFIX/$(chalk_folder)/$name
-    info Downloading Chalk from "$url"
-    rm -f "$TMP/$name" "$TMP/$name.sha256"
+    _dc_url=$URL_PREFIX/$(chalk_folder)/$_dc_name
+    info Downloading Chalk from "$_dc_url"
+    rm -f "$TMP/$_dc_name" "$TMP/$_dc_name.sha256"
     fatal_curl \
-        "Could not download $name. Are you sure this is a valid version?" \
+        "Could not download $_dc_name. Are you sure this is a valid version?" \
         -- \
-        "$url" \
+        "$_dc_url" \
         --show-error \
         --silent \
         --location \
-        --output "$TMP/$name"
+        --output "$TMP/$_dc_name"
     fatal_curl \
-        "Could not download checksum to validate $name integrity" \
+        "Could not download checksum to validate $_dc_name integrity" \
         -- \
-        "$url.sha256" \
+        "$_dc_url.sha256" \
         --show-error \
         --silent \
         --location \
-        --output "$TMP/$name.sha256"
+        --output "$TMP/$_dc_name.sha256"
     if ! [ -f "$chalk_tmp" ]; then
         return 1
     fi
     echo "$chalk_tmp" >> "$tmp_files"
-    checksum=$(cat "$chalk_tmp.sha256")
-    info Validating sha256 checksum "${checksum%% *}"
+    _dc_checksum=$(cat "$chalk_tmp.sha256")
+    info Validating sha256 checksum "${_dc_checksum%% *}"
     (
         cd "$TMP"
         $SHA256 -c "$chalk_tmp.sha256" > /dev/stderr || (
@@ -877,14 +876,14 @@ load_config() {
 
 # add lines to Chalk config
 add_lines_to_chalk() {
-    name=$1
+    _alc_name=$1
     shift
-    config=$(mktemp "chalk_${name}_XXXXXX").c4m
-    touch "$config"
-    for i; do
-        echo "$i" >> "$config"
+    _alc_config=$(mktemp "chalk_${_alc_name}_XXXXXX").c4m
+    touch "$_alc_config"
+    for _alc_i; do
+        echo "$_alc_i" >> "$_alc_config"
     done
-    chalk load "$config"
+    chalk load "$_alc_config"
     if [ -n "$debug" ]; then
         chalk dump
         chalk dump cache
@@ -893,60 +892,60 @@ add_lines_to_chalk() {
 
 # add necessary configs to wrap command with Chalk
 add_cmd_exe_to_config() {
-    cmd=$1
-    path=$2
-    folder=$(dirname "$path")
+    _acc_cmd=$1
+    _acc_path=$2
+    _acc_folder=$(dirname "$_acc_path")
     add_lines_to_chalk \
-        "$cmd" \
-        "default_command = \"$cmd\"" \
-        "${cmd}_exe = \"$folder\""
+        "$_acc_cmd" \
+        "default_command = \"$_acc_cmd\"" \
+        "${_acc_cmd}_exe = \"$_acc_folder\""
 }
 
 # wrap given command with Chalk
 wrap_cmd() {
-    cmd=$1
+    _wc_cmd=$1
 
-    if ! is_installed "$cmd"; then
+    if ! is_installed "$_wc_cmd"; then
         return
     fi
 
-    existing_path=$(command -v "$cmd")
-    chalked_path="$prefix/bin/$cmd"
-    chalkless_path="$prefix/chalkless/$cmd"
+    _wc_existing_path=$(command -v "$_wc_cmd")
+    _wc_chalked_path="$prefix/bin/$_wc_cmd"
+    _wc_chalkless_path="$prefix/chalkless/$_wc_cmd"
 
-    if [ -z "$existing_path" ]; then
-        warn Skipping wrapping "$cmd" as it is not installed
+    if [ -z "$_wc_existing_path" ]; then
+        warn Skipping wrapping "$_wc_cmd" as it is not installed
         return 0
     fi
 
-    info Wrapping "$existing_path" command with Chalk
+    info Wrapping "$_wc_existing_path" command with Chalk
 
-    if [ -f "$chalkless_path" ]; then
-        warn Using existing "$chalkless_path" as chalkless command. "$0" most likely already ran before.
+    if [ -f "$_wc_chalkless_path" ]; then
+        warn Using existing "$_wc_chalkless_path" as chalkless command. "$0" most likely already ran before.
     else
-        $SUDO mkdir -p "$(dirname "$chalkless_path")"
-        if am_owner "$existing_path" && [ "$(device_of "$chalkless_path")" = "$(device_of "$existing_path")" ]; then
+        $SUDO mkdir -p "$(dirname "$_wc_chalkless_path")"
+        if am_owner "$_wc_existing_path" && [ "$(device_of "$_wc_chalkless_path")" = "$(device_of "$_wc_existing_path")" ]; then
             # hardlinking requires more permissions
             # so only doing when owning file
             # as well as if both files are in the same file-system
             # otherwise hardlinks cant work so can only copy
-            info Hardlinking "$chalkless_path" to "$existing_path"
-            $SUDO ln "$existing_path" "$chalkless_path"
+            info Hardlinking "$_wc_chalkless_path" to "$_wc_existing_path"
+            $SUDO ln "$_wc_existing_path" "$_wc_chalkless_path"
         else
-            info Copying "$existing_path" to "$chalkless_path"
-            $SUDO cp "$existing_path" "$chalkless_path"
+            info Copying "$_wc_existing_path" to "$_wc_chalkless_path"
+            $SUDO cp "$_wc_existing_path" "$_wc_chalkless_path"
         fi
     fi
 
     # create temporary Chalk copy so that we can adjust its configuration
     # to be able to find the moved binary in the chalkless location
-    info Wrapping "$chalked_path" with Chalk
-    tmp=$(mktemp chalk.XXXXXX)
-    $SUDO cp "$chalk_path" "$tmp"
-    chalk_path=$tmp add_cmd_exe_to_config "$cmd" "$chalkless_path"
-    $SUDO rm "$chalked_path" 2> /dev/null || true
-    $SUDO cp "$tmp" "$chalked_path"
-    info Using "$chalked_path" will automatically use Chalk now
+    info Wrapping "$_wc_chalked_path" with Chalk
+    _wc_tmp=$(mktemp chalk.XXXXXX)
+    $SUDO cp "$chalk_path" "$_wc_tmp"
+    chalk_path=$_wc_tmp add_cmd_exe_to_config "$_wc_cmd" "$_wc_chalkless_path"
+    $SUDO rm "$_wc_chalked_path" 2> /dev/null || true
+    $SUDO cp "$_wc_tmp" "$_wc_chalked_path"
+    info Using "$_wc_chalked_path" will automatically use Chalk now
 }
 
 copy_keys() {
