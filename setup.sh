@@ -883,7 +883,7 @@ add_lines_to_chalk() {
     for _alc_i; do
         echo "$_alc_i" >> "$_alc_config"
     done
-    chalk load "$_alc_config"
+    chalk load "$_alc_config" || return
     if [ -n "$debug" ]; then
         chalk dump
         chalk dump cache
@@ -1282,6 +1282,28 @@ for i in $(echo "$load" | tr "," "\n" | tr " " "\n"); do
     info Loading custom Chalk config from "$i"
     load_config "$i"
 done
+
+if [ -n "${CHALK_POLICY_REPORT_FILE:-}" ]; then
+    info Configuring Chalk to write build policy reports for the job summary
+    # the file is resolved when chalk runs so the config holds no job paths.
+    # chalk versions without build policies have no policy_report template
+    # and refuse the config, which only disables the report
+    if ! add_lines_to_chalk policy_report \
+        'sink_config setup_chalk_action_policy_report {' \
+        '  enabled:         env_exists("CHALK_POLICY_REPORT_FILE")' \
+        '  sink:            "file"' \
+        '  filename:        env("CHALK_POLICY_REPORT_FILE")' \
+        '  use_search_path: false' \
+        '}' \
+        'custom_report setup_chalk_action_policy_report {' \
+        '  enabled:         env_exists("CHALK_POLICY_REPORT_FILE")' \
+        '  report_template: "policy_report"' \
+        '  sink_configs:    ["setup_chalk_action_policy_report"]' \
+        '  use_when:        ["build", "push"]' \
+        '}'; then
+        warn This Chalk version does not support build policy reports. Skipping
+    fi
+fi
 
 if [ -n "$debug" ]; then
     info Debug mode is enabled. Changing default Chalk log level to trace

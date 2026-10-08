@@ -1,0 +1,31 @@
+name: Chalk build policy report
+description: |
+  Renders chalk build policy reports at the end of the job as a job summary,
+  annotations on the Dockerfile and, optionally, a check run.
+  Used by setup-chalk-action; not meant to be used on its own.
+
+inputs:
+  report_file:
+    description: File chalk writes policy reports to. Defaults to $CHALK_POLICY_REPORT_FILE.
+    required: false
+    default: ""
+  check:
+    description: |
+      Whether to also create a check run on the commit, which can be made a
+      required check. Needs `checks: write`.
+    required: false
+    default: "false"
+  check_name:
+    description: Name of the check run.
+    required: false
+    default: Chalk build policy
+  github_token:
+    description: Token used to create the check run.
+    required: false
+    default: ${{ github.token }}
+
+runs:
+  using: node24
+  main: main.js
+  post: post.js
+  post-if: always()

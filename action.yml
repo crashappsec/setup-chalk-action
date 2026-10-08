@@ -64,6 +64,24 @@ inputs:
       Whether to continue or fail build when observables setup fails.
     required: false
     default: true
+  policy_report:
+    description: |
+      Whether to show chalk build policy findings at the end of the job,
+      as a job summary and annotations on the Dockerfile.
+      Nothing is shown unless build policies are enabled and find something.
+    required: false
+    default: true
+  policy_check:
+    description: |
+      Whether to also create a check run for chalk build policies on the
+      commit, which can then be made a required check.
+      Requires the job to have `checks: write` permission.
+    required: false
+    default: false
+  policy_check_name:
+    description: Name of the build policy check run.
+    required: false
+    default: Chalk build policy
 
 runs:
   using: "composite"
@@ -77,6 +95,14 @@ runs:
         tmp="$RUNNER_TEMP/${ACTION:-chalk}/$GITHUB_RUN_ID"
         mkdir -p "$tmp"
         echo "CHALK_TMP=$(mktemp -d -p "$tmp")" >> $GITHUB_ENV
+
+    # setup.sh configures chalk to append policy reports to this file
+    # which the policy report post step renders at the end of the job
+    - name: Set chalk policy report file
+      if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && inputs.policy_report == 'true'
+      shell: sh
+      run: |
+        echo "CHALK_POLICY_REPORT_FILE=$CHALK_TMP/policy-reports.jsonl" >> $GITHUB_ENV
 
     - name: Set chalk prefix for non-container builds
       if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && job.container.id == ''
@@ -224,6 +250,67 @@ runs:
       if: env.__CHALK_ALREADY_SETUP__ == '' && runner.os == 'Linux' && steps.chalk.outputs.setup_build_observables == 'true'
       uses: ./.tmp-observe
       continue-on-error: ${{ inputs.observables_continue_on_error }}
+
+    # composite actions cannot have post steps but the actions they use can,
+    # so the report is rendered by the nested policy-report action
+    # from the same repository and ref as this action.
+    # github doesnt support expressions in `uses` so we template inline action
+    - name: Template build policy report action
+      if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && inputs.policy_report == 'true'
+      shell: sh
+      env:
+        ACTION_REPOSITORY: ${{ github.action_repository }}
+        ACTION_REF: ${{ github.action_ref }}
+        ACTION_PATH: ${{ github.action_path }}
+      run: |
+        workspace=$(cd "$GITHUB_WORKSPACE" && pwd -P)
+        action=$(cd "$ACTION_PATH" && pwd -P)
+        case "$action/" in
+          "$workspace"/*)
+            # action checked out into the workspace, e.g. `uses: ./`
+            uses="./${action#"$workspace"}/policy-report"
+            uses=$(echo "$uses" | sed 's|//*|/|g')
+            ;;
+          *)
+            repository=$ACTION_REPOSITORY
+            ref=$ACTION_REF
+            if [ -z "$repository" ] || [ -z "$ref" ]; then
+              # remote actions live in _actions/<owner>/<repo>/<ref>
+              ref=$(basename "$ACTION_PATH")
+              repository=$(basename "$(dirname "$(dirname "$ACTION_PATH")")")/$(basename "$(dirname "$ACTION_PATH")")
+            fi
+            uses="$repository/policy-report@$ref"
+            ;;
+        esac
+        path=.tmp-chalk-policy-report
+        # the inline action reads its own inputs, which must not be
+        # evaluated as expressions of this step
+        expr='$''{{'
+        mkdir -p "$path"
+        cat <<EOF > "$path/action.yml"
+        runs:
+          using: composite
+          steps:
+          - shell: sh
+            run: rm -rf $path
+          - uses: $uses
+            with:
+              check: $expr inputs.check }}
+              check_name: $expr inputs.check_name }}
+        inputs:
+          check:
+            default: "false"
+          check_name:
+            default: ""
+        EOF
+
+    - name: Set up build policy report
+      if: env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && inputs.policy_report == 'true'
+      uses: ./.tmp-chalk-policy-report
+      continue-on-error: true
+      with:
+        check: ${{ inputs.policy_check }}
+        check_name: ${{ inputs.policy_check_name }}
 
     # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow
     # in some cases chalk needs to auth to GitHub API and it requires
