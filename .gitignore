@@ -3,3 +3,4 @@ tags
 *.pub
 *.key
 node_modules
+__pycache__/

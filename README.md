@@ -78,6 +78,12 @@ chalk cannot be installed, which also lets `docker build` run without the
 workspace's build policy. `policy_can_block` lets a workflow (or a wrapping
 action) refuse builds in that case.
 
+Discovery is optional and has a 10-second budget for host discovery and the
+policy request together. Older ChalkAPI servers without these headers, or a
+failed lookup, return `policy_can_block=false`. Each setup invocation resets
+the outputs and fallback file before authentication or installation, so a
+retry cannot inherit another profile's enforcement decision.
+
 [chalk]: https://github.com/crashappsec/chalk/
 [releases]: https://crashoverride.com/releases
 [CrashOverride]: https://crashoverride.run

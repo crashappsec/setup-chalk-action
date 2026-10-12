@@ -2,6 +2,24 @@
 
 set -eu
 
+# Start each invocation with fresh metadata, even if authentication, argument
+# validation, or setup fails before discovery. Optional metadata writes must
+# never make an otherwise working installation fail.
+policy_can_block=false
+policy_ids=
+publish_build_policy() {
+    if [ -n "${GITHUB_OUTPUT:-}" ]; then
+        printf 'policy_can_block=%s\npolicy_ids=%s\n' "$policy_can_block" "$policy_ids" \
+            >> "$GITHUB_OUTPUT" || printf '%s\n' 'Could not write build policy outputs.' >&2
+    fi
+    if [ -n "${RUNNER_TEMP:-}" ]; then
+        printf 'policy_can_block=%s\npolicy_ids=%s\n' "$policy_can_block" "$policy_ids" \
+            > "$RUNNER_TEMP/setup-chalk-policy.env" || printf '%s\n' 'Could not write build policy fallback data.' >&2
+    fi
+    return 0
+}
+publish_build_policy
+
 color() {
     (
         set +x
@@ -500,6 +518,7 @@ optional_header_value() {
 # unlike optional_header_value which matches substrings and keeps one word.
 header_value() {
     awk -v name="$(echo "$2" | tr '[:upper:]' '[:lower:]')" '
+        /^HTTP\// { found = "" }
         {
             sub(/\r$/, "")
             i = index($0, ":")
@@ -686,7 +705,7 @@ ci_repository() {
     elif [ -n "${CI_PROJECT_URL:-}" ]; then
         _cr_url=$CI_PROJECT_URL
     else
-        return
+        return 0
     fi
     _cr_repo=$(
         echo "$_cr_url" \
@@ -708,16 +727,39 @@ ci_repository() {
     esac
 }
 
-# Learn from the profile whether its build policy can block this repository,
-# before chalk is downloaded, so a failed setup can be told apart from a
-# harmless one (setup-chalk-action fails the build only in the first case).
-# Never fatal: when the lookup fails the policy is unknown and treated as
-# unable to block, as before. Also keeps the profile's chalk version.
+# Keep optional requests within one budget, including host discovery.
+policy_curl() {
+    _cbp_remaining=$((_cbp_deadline - $(date +%s)))
+    [ "$_cbp_remaining" -gt 0 ] || return 1
+    curl "$@" --connect-timeout 2 --max-time "$_cbp_remaining"
+}
+
+# Learn whether the profile's policy can block before downloading Chalk, so
+# wrappers can decide how to handle a failed installation. A failed discovery
+# keeps the default false outputs; successful discovery also caches the version.
 check_build_policy() {
-    ensure_chalkapi_host
+    _cbp_deadline=$(($(date +%s) + 10))
+    # Host discovery is optional here too. ensure_chalkapi_host deliberately
+    # fatals for profile provisioning, so do not use it for this preflight.
+    if [ -z "$CHALKAPI_HOST" ]; then
+        _cbp_route=$(mktemp policy_route.XXXXXX)
+        if ! policy_curl \
+            "$ENTITLEMENTS_HOST/v0.1/routes/chalkapi?verbose=${debug:-false}" \
+            --fail --show-error --silent --location \
+            --header "Authorization: bearer $token" \
+            --dump-header "$_cbp_route" --output /dev/null; then
+            warn Could not look up the Chalk API host for build policy discovery
+            return 0
+        fi
+        CHALKAPI_HOST=$(header_value "$_cbp_route" x-chalk-api-host)
+        if [ -z "$CHALKAPI_HOST" ]; then
+            warn Chalk API host missing from build policy discovery response
+            return 0
+        fi
+    fi
     _cbp_headers=$(mktemp policy_headers.XXXXXX)
     _cbp_body=$(mktemp chalk_version.XXXXXX)
-    if ! retry curl \
+    if ! policy_curl \
         "$CHALKAPI_HOST/v0.1/profile/version?chalkProfileKey=$profile&verbose=${debug:-false}" \
         --fail \
         --show-error \
@@ -739,6 +781,10 @@ check_build_policy() {
             policy_can_block=true
             ;;
         enforce-repos)
+            if [ -z "$_cbp_repo" ]; then
+                publish_build_policy
+                return 0
+            fi
             # split on spaces without expanding the globs against local files
             set -f
             for _cbp_glob in $(header_value "$_cbp_headers" x-chalk-policy-enforce-repos); do
@@ -754,16 +800,7 @@ check_build_policy() {
             ;;
     esac
     info "Build policy can block ${_cbp_repo:-this repository}: $policy_can_block ${policy_ids:+($policy_ids)}"
-    if [ -n "${GITHUB_OUTPUT:-}" ]; then
-        echo "policy_can_block=$policy_can_block" >> "$GITHUB_OUTPUT"
-        echo "policy_ids=$policy_ids" >> "$GITHUB_OUTPUT"
-    fi
-    # also as a file: a composite action's outputs may not reach its caller
-    # when one of its steps failed, which is when callers need this
-    if [ -n "${RUNNER_TEMP:-}" ]; then
-        printf 'policy_can_block=%s\npolicy_ids=%s\n' "$policy_can_block" "$policy_ids" \
-            > "$RUNNER_TEMP/setup-chalk-policy.env"
-    fi
+    publish_build_policy
 }
 
 set_profile_chalk_version() {
