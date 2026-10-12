@@ -66,6 +66,24 @@ For example:
     private_key: ${{ secrets.CHALK_PRIVATE_KEY }}
 ```
 
+## Outputs
+
+| Output             | Description                                                                                                                                                                                                                                                                                                                   |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `policy_can_block` | `true` when the profile's build policy can block builds of this repository (a policy in `enforce` mode, or `enforce_repos` matching it), else `false` (also when it could not be looked up). Looked up before chalk is downloaded, so it is set even when setup fails; also written to `$RUNNER_TEMP/setup-chalk-policy.env`. |
+| `policy_ids`       | Space-separated ids of the profile's build policies.                                                                                                                                                                                                                                                                          |
+
+A setup step is often marked `continue-on-error: true` so CI keeps working if
+chalk cannot be installed, which also lets `docker build` run without the
+workspace's build policy. `policy_can_block` lets a workflow (or a wrapping
+action) refuse builds in that case.
+
+Discovery is optional and has a 10-second budget for host discovery and the
+policy request together. Older ChalkAPI servers without these headers, or a
+failed lookup, return `policy_can_block=false`. Each setup invocation resets
+the outputs and fallback file before authentication or installation, so a
+retry cannot inherit another profile's enforcement decision.
+
 [chalk]: https://github.com/crashappsec/chalk/
 [releases]: https://crashoverride.com/releases
 [CrashOverride]: https://crashoverride.run

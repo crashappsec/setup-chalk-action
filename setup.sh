@@ -2,6 +2,24 @@
 
 set -eu
 
+# Start each invocation with fresh metadata, even if authentication, argument
+# validation, or setup fails before discovery. Optional metadata writes must
+# never make an otherwise working installation fail.
+policy_can_block=false
+policy_ids=
+publish_build_policy() {
+    if [ -n "${GITHUB_OUTPUT:-}" ]; then
+        printf 'policy_can_block=%s\npolicy_ids=%s\n' "$policy_can_block" "$policy_ids" \
+            >> "$GITHUB_OUTPUT" || printf '%s\n' 'Could not write build policy outputs.' >&2
+    fi
+    if [ -n "${RUNNER_TEMP:-}" ]; then
+        printf 'policy_can_block=%s\npolicy_ids=%s\n' "$policy_can_block" "$policy_ids" \
+            > "$RUNNER_TEMP/setup-chalk-policy.env" || printf '%s\n' 'Could not write build policy fallback data.' >&2
+    fi
+    return 0
+}
+publish_build_policy
+
 color() {
     (
         set +x
@@ -495,6 +513,25 @@ optional_header_value() {
     grep -i "$2" < "$1" | awk '{print $2}' | tr -d '\r\n'
 }
 
+# header_value FILE NAME
+# Print the full value of header NAME (case-insensitive exact name match),
+# unlike optional_header_value which matches substrings and keeps one word.
+header_value() {
+    awk -v name="$(echo "$2" | tr '[:upper:]' '[:lower:]')" '
+        /^HTTP\// { found = "" }
+        {
+            sub(/\r$/, "")
+            i = index($0, ":")
+            if (i > 0 && tolower(substr($0, 1, i - 1)) == name) {
+                v = substr($0, i + 1)
+                sub(/^[ \t]+/, "", v)
+                found = v
+            }
+        }
+        END { printf "%s", found }
+    ' < "$1"
+}
+
 enable_debug() {
     set -x
     log_level=trace
@@ -655,6 +692,115 @@ ensure_chalkapi_host() {
             > /dev/null
         set_chalkapi_host_from_headers "$_ech_headers"
     fi
+}
+
+# repository identity chalk matches enforce_repos against: lowercase
+# host/owner/name without scheme, credentials, numeric port, query or .git
+# (chalk src/policy/repo.nim repoFromEnv, docs/design-build-policy.md
+# "Per-repository enforcement")
+ci_repository() {
+    if [ -n "${GITHUB_REPOSITORY:-}" ]; then
+        _cr_server=$(printf '%s' "${GITHUB_SERVER_URL:-https://github.com}" | sed 's|/*$||')
+        _cr_url="$_cr_server/$GITHUB_REPOSITORY"
+    elif [ -n "${CI_PROJECT_URL:-}" ]; then
+        _cr_url=$CI_PROJECT_URL
+    else
+        return 0
+    fi
+    _cr_repo=$(
+        echo "$_cr_url" \
+            | tr '[:upper:]' '[:lower:]' \
+            | sed \
+                -e 's|[?#].*||' \
+                -e 's|^[a-z+]*://||' \
+                -e 's|^[^/]*@||' \
+                -e 's|^\([^/]*\):[0-9]*/|\1/|' \
+                -e 's|/*$||' \
+                -e 's|\.git$||' \
+                -e 's|/*$||'
+    )
+    # without an owner and a name chalk knows no repository and never
+    # escalates to enforce
+    case "$_cr_repo" in
+        *//*) ;;
+        */*/*) echo "$_cr_repo" ;;
+    esac
+}
+
+# Keep optional requests within one budget, including host discovery.
+policy_curl() {
+    _cbp_remaining=$((_cbp_deadline - $(date +%s)))
+    [ "$_cbp_remaining" -gt 0 ] || return 1
+    curl "$@" --connect-timeout 2 --max-time "$_cbp_remaining"
+}
+
+# Learn whether the profile's policy can block before downloading Chalk, so
+# wrappers can decide how to handle a failed installation. A failed discovery
+# keeps the default false outputs; successful discovery also caches the version.
+check_build_policy() {
+    _cbp_deadline=$(($(date +%s) + 10))
+    # Host discovery is optional here too. ensure_chalkapi_host deliberately
+    # fatals for profile provisioning, so do not use it for this preflight.
+    if [ -z "$CHALKAPI_HOST" ]; then
+        _cbp_route=$(mktemp policy_route.XXXXXX)
+        if ! policy_curl \
+            "$ENTITLEMENTS_HOST/v0.1/routes/chalkapi?verbose=${debug:-false}" \
+            --fail --show-error --silent --location \
+            --header "Authorization: bearer $token" \
+            --dump-header "$_cbp_route" --output /dev/null; then
+            warn Could not look up the Chalk API host for build policy discovery
+            return 0
+        fi
+        CHALKAPI_HOST=$(header_value "$_cbp_route" x-chalk-api-host)
+        if [ -z "$CHALKAPI_HOST" ]; then
+            warn Chalk API host missing from build policy discovery response
+            return 0
+        fi
+    fi
+    _cbp_headers=$(mktemp policy_headers.XXXXXX)
+    _cbp_body=$(mktemp chalk_version.XXXXXX)
+    if ! policy_curl \
+        "$CHALKAPI_HOST/v0.1/profile/version?chalkProfileKey=$profile&verbose=${debug:-false}" \
+        --fail \
+        --show-error \
+        --silent \
+        --location \
+        --request GET \
+        --header "Authorization: bearer $token" \
+        --dump-header "$_cbp_headers" \
+        --output "$_cbp_body"; then
+        warn Could not look up the build policy of Chalk profile "$profile"
+        return 0
+    fi
+    profile_version=$(tr -d '\r\n' < "$_cbp_body")
+    policy_ids=$(header_value "$_cbp_headers" x-chalk-policy-ids)
+    policy_can_block=false
+    _cbp_repo=$(ci_repository)
+    case "$(header_value "$_cbp_headers" x-chalk-policy)" in
+        enforce)
+            policy_can_block=true
+            ;;
+        enforce-repos)
+            if [ -z "$_cbp_repo" ]; then
+                publish_build_policy
+                return 0
+            fi
+            # split on spaces without expanding the globs against local files
+            set -f
+            for _cbp_glob in $(header_value "$_cbp_headers" x-chalk-policy-enforce-repos); do
+                # unquoted pattern: shell glob matching, `*` and `?` like chalk
+                # shellcheck disable=SC2254
+                case "$_cbp_repo" in
+                    $_cbp_glob)
+                        policy_can_block=true
+                        ;;
+                esac
+            done
+            set +f
+            ;;
+    esac
+    info "Build policy can block ${_cbp_repo:-this repository}: $policy_can_block ${policy_ids:+($policy_ids)}"
+    publish_build_policy
 }
 
 set_profile_chalk_version() {
@@ -1252,13 +1398,23 @@ if [ -z "$token" ] && { [ -n "$connect" ] || [ -n "$oidc" ]; }; then
     token_via_openid_connect
 fi
 
+profile_version=
+if [ -n "$token" ]; then
+    check_build_policy
+fi
+
 if ! [ -f "$chalk_path" ] || [ -n "$overwrite" ]; then
     if [ -f "$chalk_path" ]; then
         info "$chalk_path" is already installed. overwriting
     fi
 
     if [ -n "$token" ] && [ -z "$version" ]; then
-        set_profile_chalk_version
+        if [ -n "$profile_version" ]; then
+            version=$profile_version
+            info Chalk profile is configured to use version: "$version"
+        else
+            set_profile_chalk_version
+        fi
     fi
 
     if [ -z "$version" ] || [ "$version" = "latest" ]; then

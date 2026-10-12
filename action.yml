@@ -65,6 +65,18 @@ inputs:
     required: false
     default: true
 
+outputs:
+  policy_can_block:
+    description: |
+      true when the profile's build policy can block builds of this repository
+      (a policy in enforce mode, or enforce_repos matching it); false when it
+      cannot or could not be looked up. Set before chalk is downloaded, so it is
+      also available when setup fails.
+    value: ${{ steps.chalk.outputs.policy_can_block }}
+  policy_ids:
+    description: Space-separated ids of the profile's build policies.
+    value: ${{ steps.chalk.outputs.policy_ids }}
+
 runs:
   using: "composite"
   steps:
