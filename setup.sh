@@ -495,6 +495,24 @@ optional_header_value() {
     grep -i "$2" < "$1" | awk '{print $2}' | tr -d '\r\n'
 }
 
+# header_value FILE NAME
+# Print the full value of header NAME (case-insensitive exact name match),
+# unlike optional_header_value which matches substrings and keeps one word.
+header_value() {
+    awk -v name="$(echo "$2" | tr '[:upper:]' '[:lower:]')" '
+        {
+            sub(/\r$/, "")
+            i = index($0, ":")
+            if (i > 0 && tolower(substr($0, 1, i - 1)) == name) {
+                v = substr($0, i + 1)
+                sub(/^[ \t]+/, "", v)
+                found = v
+            }
+        }
+        END { printf "%s", found }
+    ' < "$1"
+}
+
 enable_debug() {
     set -x
     log_level=trace
@@ -654,6 +672,73 @@ ensure_chalkapi_host() {
             --dump-header "$_ech_headers" \
             > /dev/null
         set_chalkapi_host_from_headers "$_ech_headers"
+    fi
+}
+
+# repository identity chalk matches enforce_repos against: lowercase
+# host/owner/name (chalk docs/design-build-policy.md, "Per-repository enforcement")
+ci_repository() {
+    if [ -n "${GITHUB_REPOSITORY:-}" ]; then
+        _cr_url="${GITHUB_SERVER_URL:-https://github.com}/$GITHUB_REPOSITORY"
+    elif [ -n "${CI_PROJECT_URL:-}" ]; then
+        _cr_url=$CI_PROJECT_URL
+    else
+        return
+    fi
+    echo "$_cr_url" \
+        | tr '[:upper:]' '[:lower:]' \
+        | sed -e 's|^[a-z+]*://||' -e 's|^[^/@]*@||' -e 's|/*$||' -e 's|\.git$||'
+}
+
+# Learn from the profile whether its build policy can block this repository,
+# before chalk is downloaded, so a failed setup can be told apart from a
+# harmless one (setup-chalk-action fails the build only in the first case).
+# Never fatal: when the lookup fails the policy is unknown and treated as
+# unable to block, as before. Also keeps the profile's chalk version.
+check_build_policy() {
+    ensure_chalkapi_host
+    _cbp_headers=$(mktemp policy_headers.XXXXXX)
+    _cbp_body=$(mktemp chalk_version.XXXXXX)
+    if ! retry curl \
+        "$CHALKAPI_HOST/v0.1/profile/version?chalkProfileKey=$profile&verbose=${debug:-false}" \
+        --fail \
+        --show-error \
+        --silent \
+        --location \
+        --request GET \
+        --header "Authorization: bearer $token" \
+        --dump-header "$_cbp_headers" \
+        --output "$_cbp_body"; then
+        warn Could not look up the build policy of Chalk profile "$profile"
+        return 0
+    fi
+    profile_version=$(tr -d '\r\n' < "$_cbp_body")
+    policy_ids=$(header_value "$_cbp_headers" x-chalk-policy-ids)
+    policy_can_block=false
+    _cbp_repo=$(ci_repository)
+    case "$(header_value "$_cbp_headers" x-chalk-policy)" in
+        enforce)
+            policy_can_block=true
+            ;;
+        enforce-repos)
+            # split on spaces without expanding the globs against local files
+            set -f
+            for _cbp_glob in $(header_value "$_cbp_headers" x-chalk-policy-enforce-repos); do
+                # unquoted pattern: shell glob matching, `*` and `?` like chalk
+                # shellcheck disable=SC2254
+                case "$_cbp_repo" in
+                    $_cbp_glob)
+                        policy_can_block=true
+                        ;;
+                esac
+            done
+            set +f
+            ;;
+    esac
+    info "Build policy can block ${_cbp_repo:-this repository}: $policy_can_block ${policy_ids:+($policy_ids)}"
+    if [ -n "${GITHUB_OUTPUT:-}" ]; then
+        echo "policy_can_block=$policy_can_block" >> "$GITHUB_OUTPUT"
+        echo "policy_ids=$policy_ids" >> "$GITHUB_OUTPUT"
     fi
 }
 
@@ -1252,13 +1337,23 @@ if [ -z "$token" ] && { [ -n "$connect" ] || [ -n "$oidc" ]; }; then
     token_via_openid_connect
 fi
 
+profile_version=
+if [ -n "$token" ]; then
+    check_build_policy
+fi
+
 if ! [ -f "$chalk_path" ] || [ -n "$overwrite" ]; then
     if [ -f "$chalk_path" ]; then
         info "$chalk_path" is already installed. overwriting
     fi
 
     if [ -n "$token" ] && [ -z "$version" ]; then
-        set_profile_chalk_version
+        if [ -n "$profile_version" ]; then
+            version=$profile_version
+            info Chalk profile is configured to use version: "$version"
+        else
+            set_profile_chalk_version
+        fi
     fi
 
     if [ -z "$version" ] || [ "$version" = "latest" ]; then

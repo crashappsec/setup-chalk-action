@@ -66,6 +66,19 @@ For example:
     private_key: ${{ secrets.CHALK_PRIVATE_KEY }}
 ```
 
+## Build policies and failed setup
+
+A setup step is often marked `continue-on-error: true` so CI keeps working
+if chalk cannot be installed. Without chalk, `docker build` and `docker push`
+would then run without the workspace's build policy. Before downloading chalk,
+the action asks CrashOverride whether the profile's build policy can block this
+repository (a policy in `enforce` mode, or `enforce_repos` matching it). If
+setup then fails and the policy can block, the action puts a `docker` on `PATH`
+that refuses `build`, `push` and `bake` (other docker commands still work), so
+the build step fails with the policy's ids. If the policy cannot block, or it
+could not be looked up, builds run without chalk as before. Either way the
+action itself still fails when setup fails.
+
 [chalk]: https://github.com/crashappsec/chalk/
 [releases]: https://crashoverride.com/releases
 [CrashOverride]: https://crashoverride.run
