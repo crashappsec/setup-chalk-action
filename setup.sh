@@ -676,18 +676,36 @@ ensure_chalkapi_host() {
 }
 
 # repository identity chalk matches enforce_repos against: lowercase
-# host/owner/name (chalk docs/design-build-policy.md, "Per-repository enforcement")
+# host/owner/name without scheme, credentials, numeric port, query or .git
+# (chalk src/policy/repo.nim repoFromEnv, docs/design-build-policy.md
+# "Per-repository enforcement")
 ci_repository() {
     if [ -n "${GITHUB_REPOSITORY:-}" ]; then
-        _cr_url="${GITHUB_SERVER_URL:-https://github.com}/$GITHUB_REPOSITORY"
+        _cr_server=$(printf '%s' "${GITHUB_SERVER_URL:-https://github.com}" | sed 's|/*$||')
+        _cr_url="$_cr_server/$GITHUB_REPOSITORY"
     elif [ -n "${CI_PROJECT_URL:-}" ]; then
         _cr_url=$CI_PROJECT_URL
     else
         return
     fi
-    echo "$_cr_url" \
-        | tr '[:upper:]' '[:lower:]' \
-        | sed -e 's|^[a-z+]*://||' -e 's|^[^/@]*@||' -e 's|/*$||' -e 's|\.git$||'
+    _cr_repo=$(
+        echo "$_cr_url" \
+            | tr '[:upper:]' '[:lower:]' \
+            | sed \
+                -e 's|[?#].*||' \
+                -e 's|^[a-z+]*://||' \
+                -e 's|^[^/]*@||' \
+                -e 's|^\([^/]*\):[0-9]*/|\1/|' \
+                -e 's|/*$||' \
+                -e 's|\.git$||' \
+                -e 's|/*$||'
+    )
+    # without an owner and a name chalk knows no repository and never
+    # escalates to enforce
+    case "$_cr_repo" in
+        *//*) ;;
+        */*/*) echo "$_cr_repo" ;;
+    esac
 }
 
 # Learn from the profile whether its build policy can block this repository,
