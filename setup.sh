@@ -740,6 +740,12 @@ check_build_policy() {
         echo "policy_can_block=$policy_can_block" >> "$GITHUB_OUTPUT"
         echo "policy_ids=$policy_ids" >> "$GITHUB_OUTPUT"
     fi
+    # also as a file: a composite action's outputs may not reach its caller
+    # when one of its steps failed, which is when callers need this
+    if [ -n "${RUNNER_TEMP:-}" ]; then
+        printf 'policy_can_block=%s\npolicy_ids=%s\n' "$policy_can_block" "$policy_ids" \
+            > "$RUNNER_TEMP/setup-chalk-policy.env"
+    fi
 }
 
 set_profile_chalk_version() {

@@ -65,6 +65,18 @@ inputs:
     required: false
     default: true
 
+outputs:
+  policy_can_block:
+    description: |
+      true when the profile's build policy can block builds of this repository
+      (a policy in enforce mode, or enforce_repos matching it); false when it
+      cannot or could not be looked up. Set before chalk is downloaded, so it is
+      also available when setup fails.
+    value: ${{ steps.chalk.outputs.policy_can_block }}
+  policy_ids:
+    description: Space-separated ids of the profile's build policies.
+    value: ${{ steps.chalk.outputs.policy_ids }}
+
 runs:
   using: "composite"
   steps:
@@ -181,21 +193,8 @@ runs:
         CHALK_PUBLIC_KEY: ${{ inputs.public_key != '' && format('{0}/chalk.pub', env.CHALK_TMP) || '' }}
         CHALK_PRIVATE_KEY: ${{ inputs.private_key != '' && format('{0}/chalk.key', env.CHALK_TMP) || '' }}
         ACTION_PATH: ${{ steps.action_path.outputs.value }}
-      # a failed setup is re-raised by the next step, after it has checked
-      # whether the build policy needs docker locked down
-      continue-on-error: true
       run: |
         "$ACTION_PATH/setup.sh"
-
-    - name: Guard build policy after failed chalk setup
-      if: steps.chalk.outcome == 'failure'
-      shell: sh
-      env:
-        CAN_BLOCK: ${{ steps.chalk.outputs.policy_can_block }}
-        POLICY_IDS: ${{ steps.chalk.outputs.policy_ids }}
-        ACTION_PATH: ${{ steps.action_path.outputs.value }}
-      run: |
-        "$ACTION_PATH/policy-guard.sh" "$CHALK_PREFIX" "$CAN_BLOCK" "$POLICY_IDS"
 
     - name: Cleanup Public Key
       if: always() && env.__CHALK_ALREADY_SETUP__ == '' && (runner.os == 'Linux' || runner.os == 'macOS') && inputs.public_key != ''
