@@ -66,6 +66,32 @@ For example:
     private_key: ${{ secrets.CHALK_PRIVATE_KEY }}
 ```
 
+## Build policies: vulnerable dependencies
+
+Chalk build policies with the `vulnerabilities` (or `sast`) check review the
+dependencies a pull request adds with GitHub's
+[dependency review API](https://docs.github.com/en/rest/dependency-graph/dependency-review)
+and block or report those with known vulnerabilities. This runs in
+`pull_request`, `pull_request_target` and `merge_group` jobs (`push` is
+opt-in). It needs:
+
+- the job token: the action exports `GITHUB_TOKEN=${{ github.token }}` for
+  chalk, so nothing to pass, but the job must be able to read the repository
+  contents:
+
+  ```yaml
+  permissions:
+    contents: read
+  ```
+
+- the dependency graph enabled for the repository and, for private
+  repositories, GitHub Code Security (or Advanced Security). Without them
+  chalk only logs a warning and adds it to the job summary; builds are not
+  blocked for it.
+
+See the `Vulnerable dependencies` section of chalk's
+[build policy docs](https://github.com/crashappsec/chalk/blob/main/docs/design-build-policy.md).
+
 [chalk]: https://github.com/crashappsec/chalk/
 [releases]: https://crashoverride.com/releases
 [CrashOverride]: https://crashoverride.run
