@@ -510,7 +510,7 @@ set_chalkapi_host_from_headers() {
 }
 
 # The entitlements service resolves the Chalk API host only from a Chalk JWT
-# or a CI OIDC token, so other credentials (e.g. a WorkOS API key) need the host
+# or a CI OIDC token, so other credentials (e.g. a Gatekeeper chalk ingest key) need the host
 # given explicitly. It is used as "$CHALKAPI_HOST/v0.1/...", hence
 # https://HOST[:PORT][/PATH] only: no trailing slash, credentials, query,
 # fragment or whitespace.
