@@ -261,6 +261,8 @@ public_key=${CHALK_PUBLIC_KEY:-}
 private_key=${CHALK_PRIVATE_KEY:-}
 # run chalk setup
 setup=${CHALK_SETUP:-}
+# Chalk API host to use as is; skips every entitlements service lookup
+chalkapi_host=${CHALK_API_HOST:-}
 
 do_help=
 chalk_path=
@@ -505,6 +507,24 @@ set_chalkapi_host_from_headers() {
     # grab the Chalk API host from the response headers to avoid a dependency on jq
     CHALKAPI_HOST=$(optional_header_value "$1" x-chalk-api-host)
     [ -n "$CHALKAPI_HOST" ] || fatal "Could not lookup Chalk API host via entitlements service."
+}
+
+# The entitlements service resolves the Chalk API host only from a Chalk JWT
+# or a CI OIDC token, so other credentials (e.g. a Gatekeeper chalk ingest key) need the host
+# given explicitly. It is used as "$CHALKAPI_HOST/v0.1/...", hence
+# https://HOST[:PORT][/PATH] only: no trailing slash, credentials, query,
+# fragment or whitespace.
+validate_chalkapi_host() {
+    case "$1" in
+        *[!A-Za-z0-9.:/_~-]*) ;;
+        *)
+            if printf '%s\n' "$1" | grep -Eq '^https://[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]{1,5})?(/[A-Za-z0-9._~-]+)*$'; then
+                return 0
+            fi
+            ;;
+    esac
+    fatal "Invalid Chalk API host (chalkapi_host input / CHALK_API_HOST / --chalkapi-host):" \
+        "it must be an https URL without a trailing slash, e.g. https://chalk.example.com"
 }
 
 openid_connect_github() {
@@ -1023,6 +1043,9 @@ Args:
                        if --public-key and --private-key are provided.
                        Mutually exclusive with --saas as it disables
                        seting up chalk's attestation.
+--chalkapi-host=*      Chalk API host (https URL without a trailing
+                       slash) to use instead of looking it up via
+                       the entitlements service. Also CHALK_API_HOST.
 --latest-version-url=* URL to get latest chalk version if
                        --version is not provided.
                        Default is '${latest_version_url}'.
@@ -1126,6 +1149,9 @@ while [ "$n" -gt 0 ]; do
         --latest-version-url)
             latest_version_url=${1:-$latest_version_url}
             ;;
+        --chalkapi-host)
+            chalkapi_host=$1
+            ;;
         --load)
             load=$1
             ;;
@@ -1219,6 +1245,13 @@ done
 
 if [ -n "$do_help" ]; then
     help 0
+fi
+
+# every entitlements lookup is guarded by an empty CHALKAPI_HOST
+if [ -n "$chalkapi_host" ]; then
+    validate_chalkapi_host "$chalkapi_host"
+    CHALKAPI_HOST=$chalkapi_host
+    info Using Chalk API host "$CHALKAPI_HOST"
 fi
 
 # if wrapping is enabled $prefix/bin should be on PATH

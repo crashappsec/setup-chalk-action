@@ -39,6 +39,14 @@ inputs:
       CrashOverride API Token.
       It is automatically fetched via OpenID connect if not provided when `connect=true`.
     required: false
+  chalkapi_host:
+    description: |
+      Chalk API host to use, e.g. https://chalk.example.com (https, no trailing slash).
+      By default it is looked up via the CrashOverride entitlements service,
+      which only resolves Chalk JWTs and OIDC tokens; set it for any other token.
+      When set, no entitlements service lookup is made.
+    required: false
+    default: ""
   password:
     description: |
       Password for chalk signing key.
@@ -175,6 +183,7 @@ runs:
         CHALK_LOAD: ${{ inputs.load }}
         CHALK_PARAMS: ${{ inputs.params }}
         CHALK_TOKEN: ${{ inputs.token }}
+        CHALK_API_HOST: ${{ inputs.chalkapi_host }}
         CHALK_PROFILE: ${{ inputs.profile }}
         CHALK_CONNECT: ${{ inputs.connect == 'true' && 'true' || '' }}
         CHALK_DEBUG: ${{ runner.debug == '1' && 'true' || '' }}
