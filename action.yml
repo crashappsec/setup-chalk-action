@@ -6,9 +6,16 @@ inputs:
     description: |
       Version of chalk to install.
       By default latest version is installed.
+      Use `dev` to install the internal CrashOverride chalk release.
       See https://crashoverride.com/releases for all available versions.
     required: false
     default: ""
+  environment:
+    description: |
+      CrashOverride environment to connect to - `prod`, `preprod` or `test`.
+      Non-prod environments are meant for internal use only.
+    required: false
+    default: prod
   latest_version_url:
     description: |
       URL where to query for the latest chalk version.
@@ -171,6 +178,7 @@ runs:
       env:
         CHALK_OBSERVABLES_VERSION: ${{ inputs.observables_version }}
         CHALK_VERSION: ${{ inputs.version }}
+        CHALK_ENVIRONMENT: ${{ inputs.environment }}
         CHALK_LATEST_VERSION_URL: ${{ inputs.latest_version_url }}
         CHALK_LOAD: ${{ inputs.load }}
         CHALK_PARAMS: ${{ inputs.params }}
