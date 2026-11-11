@@ -214,6 +214,10 @@ default_prefix() {
 version=${CHALK_VERSION:-}
 # url to fetch latest chalk version
 latest_version_url=${CHALK_LATEST_VERSION_URL:-$URL_PREFIX/chalk/current-version.txt}
+# url to fetch the internal CrashOverride chalk release, used with --version=dev
+DEV_VERSION_URL=$URL_PREFIX/crashoverride/chalk/current-version.txt
+# CrashOverride environment to connect to: prod (default), preprod or test
+environment=${CHALK_ENVIRONMENT:-}
 # which config to load after install
 load=${CHALK_LOAD:-}
 # json params to load
@@ -764,14 +768,15 @@ get_chalk_version() {
     echo "$version"
 }
 
-# find out latest chalk version
+# find out latest chalk version from the given url
 set_latest_version() {
-    info Querying latest version of chalk
+    _slv_url=$1
+    info Querying latest version of chalk from "$_slv_url"
     _slv_result=$(mktemp latest_version.XXXXXX)
     fatal_curl \
-        "Could not query latest chalk version from $latest_version_url" \
+        "Could not query latest chalk version from $_slv_url" \
         -- \
-        "$latest_version_url" \
+        "$_slv_url" \
         -sSL \
         --output "$_slv_result"
     version=$(tr -d '\r\n' < "$_slv_result")
@@ -972,6 +977,10 @@ Args:
                        If empty and --connect is used,
                        version is lookedup from CrashOverride profile.
                        Otherwise default is 'latest'.
+                       'dev' installs the internal CrashOverride release.
+--environment=*        CrashOverride environment to connect to:
+                       'prod', 'preprod' or 'test'. Default is 'prod'.
+                       Non-prod environments are for internal use only.
 --load=*               Comma/newline delimited paths/URLs
                        of Chalk components to load.
 --params=*             JSON of component params to load.
@@ -1126,6 +1135,9 @@ while [ "$n" -gt 0 ]; do
         --latest-version-url)
             latest_version_url=${1:-$latest_version_url}
             ;;
+        --environment)
+            environment=$1
+            ;;
         --load)
             load=$1
             ;;
@@ -1241,6 +1253,24 @@ else
     fi
 fi
 
+# non-prod environments have their own Chalk API, which entitlements does not
+# resolve, so set it directly; every entitlements lookup is skipped when it is set
+case "${environment:-prod}" in
+    prod) ;;
+    preprod)
+        CHALKAPI_HOST=https://chalk.preprod.crashoverride.run
+        ;;
+    test)
+        CHALKAPI_HOST=https://chalk-sandbox.test.crashoverride.run
+        ;;
+    *)
+        fatal "unsupported environment '$environment'. Must be 'prod', 'preprod' or 'test'"
+        ;;
+esac
+if [ -n "$CHALKAPI_HOST" ]; then
+    warn "Using $environment environment ($CHALKAPI_HOST) which is meant for internal use only."
+fi
+
 if [ -n "$debug" ]; then
     enable_debug
 fi
@@ -1261,9 +1291,14 @@ if ! [ -f "$chalk_path" ] || [ -n "$overwrite" ]; then
         set_profile_chalk_version
     fi
 
-    if [ -z "$version" ] || [ "$version" = "latest" ]; then
-        set_latest_version
-    fi
+    case "$version" in
+        "" | latest)
+            set_latest_version "$latest_version_url"
+            ;;
+        dev)
+            set_latest_version "$DEV_VERSION_URL"
+            ;;
+    esac
 
     download_chalk
     install_chalk
