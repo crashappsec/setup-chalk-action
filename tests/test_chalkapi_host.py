@@ -17,7 +17,7 @@ from urllib.parse import urlsplit
 ROOT = Path(__file__).resolve().parents[1]
 ENTITLEMENTS = "entitlements.crashoverride.run"
 DISCOVERED = "chalkapi.discovered.invalid"
-OVERRIDE = "chalk-sandbox.test.invalid"
+OVERRIDE = "chalk.example.invalid"
 
 
 class ChalkApiHostTests(unittest.TestCase):
